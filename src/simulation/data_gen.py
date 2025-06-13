@@ -1,15 +1,25 @@
 """
-Test Data Generator for Streaming JSON Parser Benchmarks
-========================================================
+Data Generator for Streaming JSON Parser Benchmarks
+===================================================
 
-Generates deterministic JSON test data with varying complexity levels.
+Generates deterministic JSON test data with varying complexity levels for
+benchmarking streaming JSON parser implementations. This module provides
+the core data generation functionality used by the benchmarking system.
+
+Key Features:
+- Deterministic data generation with configurable complexity
+- Support for nested objects, arrays, and mixed data types
+- Streaming chunk generation for network simulation
+- Data validation and metadata generation
+
+This is a production module used by the benchmarking system, not a test file.
+For testing this module, see tests/simulation/test_data_gen.py
 """
 
 import json
 import random
 from datetime import datetime
 from typing import Dict, List, Any, Tuple
-from abc import ABC, abstractmethod
 from enum import Enum
 
 
@@ -105,7 +115,7 @@ class FieldCounter:
     
     @property
     def remaining_fields(self) -> int:
-        """Get number of remaining fields to create."""
+        """Get the number of remaining fields to create."""
         return self._target_fields - self._fields_created
     
     def increment(self, count: int = 1) -> None:
@@ -241,7 +251,8 @@ class SimpleFieldGenerator:
             return self._value_generator.generate_boolean()
         elif field_type == DataType.NULL:
             return None
-    
+        return None
+
     @staticmethod
     def _generate_simple_number() -> int | float:
         """Generate a number for simple fields."""
@@ -274,19 +285,19 @@ class DataGenerator:
     def generate(self) -> Dict[str, Any]:
         """Generate test data with the specified number of fields."""
         random.seed(42 + self._field_counter.target_fields)
-        data = {}
+        data_generated = {}
         
         while self._field_counter.has_remaining_fields():
             field_name = f"field_{self._field_counter.fields_created}"
             field_value = self._create_field_value()
-            data[field_name] = field_value
+            data_generated[field_name] = field_value
         
-        data["_metadata"] = self._metadata_generator.generate_metadata(
+        data_generated["_metadata"] = self._metadata_generator.generate_metadata(
             self._field_counter.fields_created,
             self._field_counter.target_fields
         )
         
-        return data
+        return data_generated
     
     def _create_field_value(self) -> Any:
         """Create a field value based on remaining fields and probabilities."""
@@ -389,8 +400,9 @@ class MixedComplexityDataGenerator:
         
         return data
     
-    def _populate_simple_fields(self, section: Dict[str, Any], count: int) -> None:
-        """Populate simple fields section."""
+    @staticmethod
+    def _populate_simple_fields(section: Dict[str, Any], count: int) -> None:
+        """Populate a simple fields section."""
         for i in range(count):
             section[f"simple_{i}"] = random.choice([
                 f"Simple string value {i}",
@@ -398,15 +410,15 @@ class MixedComplexityDataGenerator:
                 random.choice([True, False]),
                 None
             ])
-    
+
     def _populate_arrays(self, section: Dict[str, Any], count: int) -> None:
-        """Populate arrays section."""
+        """Populate an arrays section."""
         for i in range(count):
             array_size = random.randint(5, 20)
             section[f"array_{i}"] = [random.randint(1, 1000) for _ in range(array_size)]
-    
+
     def _populate_nested_objects(self, section: Dict[str, Any], count: int) -> None:
-        """Populate nested objects section."""
+        """Populate a nested objects section."""
         for i in range(count):
             section[f"nested_{i}"] = {
                 "level_1": {
@@ -416,17 +428,17 @@ class MixedComplexityDataGenerator:
                     }
                 }
             }
-    
+
     def _populate_mixed_arrays(self, section: Dict[str, Any], count: int) -> None:
-        """Populate mixed arrays section."""
+        """Populate a mixed arrays section."""
         for i in range(count):
             section[f"mixed_{i}"] = [
                 {"id": j, "value": f"Item {j}"}
                 for j in range(random.randint(3, 10))
             ]
-    
+
     def _populate_deep_nesting(self, section: Dict[str, Any], count: int) -> None:
-        """Populate deep nesting section."""
+        """Populate a deep nesting section."""
         current_level = section
         for i in range(count):
             current_level[f"level_{i}"] = {
@@ -529,32 +541,28 @@ def validate_generated_data(data: Dict[str, Any], expected_fields: int) -> bool:
 
 
 if __name__ == "__main__":
-    """Test the data generator."""
-    print("Testing data generator...")
+    """
+    Demo script showing data generator capabilities.
+    
+    This is a demonstration of the data generator functionality.
+    For comprehensive testing, run the test suite: pytest tests/simulation/test_data_gen.py
+    """
+    print("Data Generator Demo")
+    print("=" * 50)
+    print("This demonstrates the data generation capabilities.")
+    print("For comprehensive testing, run: pytest tests/simulation/test_data_gen.py")
+    print()
 
-    for size in [100, 1500, 10000]:
-        print(f"\nGenerating {size} fields...")
-
-        data = generate_test_data(size)
-        json_str = json.dumps(data, separators=(',', ':'))
-        json_bytes = json_str.encode('utf-8')
-
-        print(f"  JSON string length: {len(json_str):,} characters")
-        print(f"  JSON bytes length: {len(json_bytes):,} bytes")
-
-        chunks = create_streaming_chunks(json_bytes)
-        print(f"  Number of chunks: {len(chunks)}")
-        print(f"  Average chunk size: {len(json_bytes) // len(chunks)} bytes")
-
-        # Validate
-        is_valid = validate_generated_data(data, size)
-        print(f"  Validation: {'✓ PASS' if is_valid else '✗ FAIL'}")
-
-        # Test JSON parsing
-        try:
-            parsed = json.loads(json_str)
-            print(f"  JSON parsing: ✓ PASS")
-        except Exception as e:
-            print(f"  JSON parsing: ✗ FAIL - {e}")
-
-    print("\nData generator test completed!")
+    # Demo with a small dataset
+    demo_size = 100
+    print(f"Generating demo dataset with {demo_size} fields...")
+    
+    data = generate_test_data(demo_size)
+    json_str = json.dumps(data, separators=(',', ':'))
+    json_bytes = json_str.encode('utf-8')
+    chunks = create_streaming_chunks(json_bytes)
+    
+    print(f"✓ Generated {len(json_str):,} characters")
+    print(f"✓ Created {len(chunks)} streaming chunks")
+    print(f"✓ Validation: {'PASS' if validate_generated_data(data, demo_size) else 'FAIL'}")
+    print("\nDemo completed! Use this module in your benchmarking applications.")

@@ -1,0 +1,8 @@
+*.csv
+*.json
+*.log
+*.pyc
+*.pyo
+*.pyclass
+*.pyo
+__pycache__

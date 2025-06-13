@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 """
 Report Generator for Streaming JSON Parser Benchmarks
 
@@ -7,6 +9,7 @@ with rankings, the best algorithm identification, and detailed analysis.
 import argparse
 import json
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -29,7 +32,8 @@ class PerformanceCategory:
 class ResultsLoader:
     """Handles loading of benchmark results from files."""
     
-    def load_results(self, csv_path: Path) -> pd.DataFrame:
+    @staticmethod
+    def load_results(csv_path: Path) -> pd.DataFrame:
         """Load benchmark results from CSV file."""
         try:
             df = pd.read_csv(csv_path)
@@ -91,8 +95,9 @@ class PerformanceCategoryManager:
 class StatisticsCalculator:
     """Calculates statistics for performance analysis."""
     
-    def calculate_algorithm_statistics(self, df: pd.DataFrame, 
-                                     algorithm_col: str) -> Dict[str, Dict[str, Any]]:
+    @staticmethod
+    def calculate_algorithm_statistics(df: pd.DataFrame,
+                                       algorithm_col: str) -> Dict[str, Dict[str, Any]]:
         """Calculate statistics per algorithm for all metrics."""
         statistics = {}
         category_manager = PerformanceCategoryManager()
@@ -114,7 +119,8 @@ class StatisticsCalculator:
 class RankingGenerator:
     """Generates rankings for different performance categories."""
     
-    def generate_rankings(self, statistics: Dict[str, Dict[str, Any]]) -> Dict[str, List[str]]:
+    @staticmethod
+    def generate_rankings(statistics: Dict[str, Dict[str, Any]]) -> Dict[str, List[str]]:
         """Generate rankings for each performance category."""
         rankings = {}
         category_manager = PerformanceCategoryManager()
@@ -138,7 +144,8 @@ class RankingGenerator:
 class BestAlgorithmFinder:
     """Finds the best algorithm for each performance category."""
     
-    def find_best_algorithms(self, rankings: Dict[str, List[str]]) -> Dict[str, str]:
+    @staticmethod
+    def find_best_algorithms(rankings: Dict[str, List[str]]) -> Dict[str, str]:
         """Find the best algorithm for each category."""
         best_algorithms = {}
         
@@ -179,12 +186,13 @@ class PerformanceAnalyzer:
         # Generate rankings
         analysis['rankings'] = self._ranking_generator.generate_rankings(analysis['statistics'])
         
-        # Find best algorithms
+        # Find the best algorithms
         analysis['best_algorithms'] = self._best_finder.find_best_algorithms(analysis['rankings'])
         
         return analysis
     
-    def _get_algorithm_column(self, df: pd.DataFrame) -> str:
+    @staticmethod
+    def _get_algorithm_column(df: pd.DataFrame) -> str:
         """Get the algorithm column name."""
         return 'algorithm_name' if 'algorithm_name' in df.columns else 'algorithm'
 
@@ -192,7 +200,8 @@ class PerformanceAnalyzer:
 class ValueFormatter:
     """Formats values for display in reports."""
     
-    def format_value(self, value: float, metric: str) -> str:
+    @staticmethod
+    def format_value(value: float, metric: str) -> str:
         """Format value based on metric type."""
         if 'time_ms' in metric:
             return f"{value:.2f}ms"
@@ -218,6 +227,7 @@ class EmojiRankingGenerator:
     def generate_emoji_rankings(self, analysis: Dict[str, Any]) -> str:
         """Generate emoji-formatted rankings for each category."""
         rankings_text = []
+        medal_emojis = ["🥇", "🥈", "🥉"]
         
         for category in self._category_manager.get_categories():
             if category.metric_key not in analysis['rankings']:
@@ -229,14 +239,13 @@ class EmojiRankingGenerator:
             top_algorithms = analysis['rankings'][category.metric_key][:3]
             
             for i, algo in enumerate(top_algorithms):
-                if (category.metric_key in analysis['statistics'] and 
-                    algo in analysis['statistics'][category.metric_key]):
-                    
-                    value = analysis['statistics'][category.metric_key][algo]['mean']
-                    formatted_value = self._formatter.format_value(value, category.metric_key)
-                    
-                    emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉"
-                    rankings_text.append(f"  {emoji} {i+1}. {algo}: {formatted_value}")
+                stats = analysis['statistics'].get(category.metric_key, {}).get(algo)
+                if not stats:
+                    continue
+                
+                value = stats['mean']
+                formatted_value = self._formatter.format_value(value, category.metric_key)
+                rankings_text.append(f"  {medal_emojis[i]} {i+1}. {algo}: {formatted_value}")
         
         return "\n".join(rankings_text)
 
@@ -276,7 +285,7 @@ class DetailedAnalysisGenerator:
         return "\n".join(report_lines)
     
     def _add_best_algorithms_summary(self, report_lines: List[str], analysis: Dict[str, Any]) -> None:
-        """Add best algorithms summary to report."""
+        """Add the best algorithms summary to the report."""
         for category in self._category_manager.get_categories():
             if category.metric_key in analysis['best_algorithms']:
                 best_algo = analysis['best_algorithms'][category.metric_key]
@@ -288,8 +297,9 @@ class DetailedAnalysisGenerator:
                     formatted_value = self._formatter.format_value(value, category.metric_key)
                     report_lines.append(f"🏃 **{category.display_name}:** {best_algo} ({formatted_value})")
     
-    def _add_performance_insights(self, report_lines: List[str], analysis: Dict[str, Any]) -> None:
-        """Add performance insights to report."""
+    @staticmethod
+    def _add_performance_insights(report_lines: List[str], analysis: Dict[str, Any]) -> None:
+        """Add performance insights to the report."""
         report_lines.extend([
             "\n## 📊 PERFORMANCE INSIGHTS",
             "-" * 30
@@ -321,7 +331,8 @@ class DetailedAnalysisGenerator:
             if len(algo_data) > 0:
                 self._add_algorithm_stats(report_lines, algo, algo_data)
     
-    def _add_algorithm_stats(self, report_lines: List[str], algo: str, algo_data: pd.DataFrame) -> None:
+    @staticmethod
+    def _add_algorithm_stats(report_lines: List[str], algo: str, algo_data: pd.DataFrame) -> None:
         """Add statistics for a single algorithm."""
         avg_ser_time = algo_data['serialize_time_ms'].mean() if 'serialize_time_ms' in algo_data.columns else 0
         avg_deser_time = algo_data['deserialize_time_ms'].mean() if 'deserialize_time_ms' in algo_data.columns else 0
@@ -353,8 +364,9 @@ class CsvExporter:
         summary_df.to_csv(output_path, index=False)
         logger.info(f"CSV summary exported to {output_path}")
     
-    def _add_category_data(self, summary_data: List[Dict], category: PerformanceCategory, 
-                          analysis: Dict[str, Any]) -> None:
+    @staticmethod
+    def _add_category_data(summary_data: List[Dict], category: PerformanceCategory,
+                           analysis: Dict[str, Any]) -> None:
         """Add data for a single category."""
         for rank, algo in enumerate(analysis['rankings'][category.metric_key], 1):
             if (category.metric_key in analysis['statistics'] and 
@@ -393,7 +405,8 @@ class JsonExporter:
             json.dump(json_analysis, f, indent=2)
         logger.info(f"JSON report exported to {output_path}")
     
-    def _convert_numpy_types(self, obj: Any) -> Any:
+    @staticmethod
+    def _convert_numpy_types(obj: Any) -> Any:
         """Convert numpy types to native Python types for JSON serialization."""
         if isinstance(obj, np.integer):
             return int(obj)
@@ -401,10 +414,10 @@ class JsonExporter:
             return float(obj)
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
-        elif isinstance(obj, dict):
-            return {key: self._convert_numpy_types(value) for key, value in obj.items()}
-        elif isinstance(obj, list):
-            return [self._convert_numpy_types(item) for item in obj]
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, np.void):
+            return None
         return obj
 
 
@@ -414,15 +427,29 @@ class ReportGenerator:
     def __init__(self, results_dir: str = ".", output_dir: str = "."):
         """
         Initialize the report generator.
-        
+
         Args:
             results_dir: Directory containing benchmark result files
             output_dir: Directory to save generated reports
         """
-        self.results_dir = Path(results_dir)
-        self.output_dir = Path(output_dir)
+        # Define your allowed base directory (project root)
+        base_dir = Path(__file__).parent.resolve()
+
+        # Sanitize results_dir to prevent path traversal
+        self.results_dir = Path(results_dir).resolve()
+        try:
+            self.results_dir.relative_to(base_dir)
+        except ValueError:
+            raise ValueError(f"Invalid results_dir: Path traversal detected. ({self.results_dir})")
+
+        # Sanitize output_dir to prevent path traversal
+        self.output_dir = os.path.join(output_dir).resolve()
+        try:
+            self.output_dir.relative_to(base_dir)
+        except ValueError:
+            raise ValueError(f"Invalid output_dir: Path traversal detected. ({self.output_dir})")
         self.output_dir.mkdir(exist_ok=True)
-        
+
         # Initialize components
         self._results_loader = ResultsLoader()
         self._file_finder = FileFinder(self.results_dir)
@@ -454,10 +481,10 @@ class ReportGenerator:
     def generate_report(self, results_file: Optional[str] = None) -> str:
         """
         Generate a comprehensive benchmark analysis report.
-        
+
         Args:
             results_file: Specific results file to analyze (optional)
-            
+
         Returns:
             Path to generated report file
         """
@@ -475,7 +502,17 @@ class ReportGenerator:
         report_content = self.generate_detailed_analysis(analysis, df)
         report_path = self.output_dir / f"benchmark_analysis_{timestamp}.md"
         
-        with open(report_path, 'w') as f:
+        safe_base_dir = '/safe/reports'
+        abs_report_path = os.path.abspath(report_path)
+        if not abs_report_path.startswith(os.path.abspath(safe_base_dir)):
+            raise ValueError("Invalid report path")
+        try:
+            with open(Path(abs_report_path), 'w', encoding='utf-8') as f:
+                # write to file
+                pass
+            os.chmod(abs_report_path, 0o600)
+        except OSError as e:
+            print(f"Failed to open file {abs_report_path}: {e}")
             f.write(report_content)
         
         # CSV summary
@@ -494,7 +531,7 @@ class ReportGenerator:
         return str(report_path)
     
     def _get_results_file(self, results_file: Optional[str]) -> Path:
-        """Get the results file to analyze."""
+        """Get the result file to analyze."""
         if results_file:
             csv_path = Path(results_file)
             if not csv_path.exists():
@@ -531,7 +568,7 @@ def main():
     
     # Setup logging
     level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(level=level, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=level, format='%(pastime)s - %(levelness)s - %(message)s')
     
     try:
         generator = ReportGenerator(args.results_dir, args.output_dir)

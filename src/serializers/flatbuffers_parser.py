@@ -433,9 +433,13 @@ class PartialObjectReconstructor:
     @staticmethod
     def _is_valid_key_token(tokens: List[str], index: int) -> bool:
         """Check if token at index is a valid key."""
-        return (index < len(tokens) and
-                tokens[index].startswith('"') and
-                tokens[index].endswith('"'))
+        token = tokens[index] if index < len(tokens) else None
+        return (
+            token is not None and
+            isinstance(token, str) and
+            token.startswith('"') and
+            token.endswith('"')
+        )
 
     @staticmethod
     def _extract_key(token: str) -> str:
@@ -459,11 +463,13 @@ class PartialObjectReconstructor:
     def _parse_value_token(value_token: str) -> Any:
         """Parse value token into the appropriate Python type."""
         try:
-            if value_token.startswith('"') and value_token.endswith('"'):
+            if value_token is None:
+                return None
+            if isinstance(value_token, str) and value_token.startswith('"') and value_token.endswith('"'):
                 return value_token[1:-1]  # String value
-            elif value_token.lower() in ['true', 'false']:
+            elif isinstance(value_token, str) and value_token.lower() in ['true', 'false']:
                 return value_token.lower() == 'true'
-            elif value_token.lower() == 'null':
+            elif isinstance(value_token, str) and value_token.lower() == 'null':
                 return None
             else:
                 return json.loads(value_token)  # Number or other
