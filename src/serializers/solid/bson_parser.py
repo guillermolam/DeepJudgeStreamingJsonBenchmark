@@ -5,7 +5,19 @@ with BSON-inspired binary-like chunking and type handling.
 """
 import json
 import struct
-from typing import Any, Dict
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
+
+
+@dataclass
+class ParserState:
+    """Internal mutable parser state."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
+    binary_buffer: bytearray = field(default_factory=bytearray)
+    document_length: Optional[int] = None
+    current_position: int = 0
 
 
 class StreamingJsonParser:
@@ -13,11 +25,40 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self.buffer = ""
-        self.parsed_data = {}
-        self.binary_buffer = bytearray()
-        self.document_length = None
-        self.current_position = 0
+        self._state = ParserState()
+
+    # Properties to expose internal state
+    @property
+    def buffer(self) -> str:
+        return self._state.buffer
+
+    @buffer.setter
+    def buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
+
+    @property
+    def binary_buffer(self) -> bytearray:
+        return self._state.binary_buffer
+
+    @property
+    def document_length(self) -> Optional[int]:
+        return self._state.document_length
+
+    @document_length.setter
+    def document_length(self, value: Optional[int]) -> None:
+        self._state.document_length = value
+
+    @property
+    def current_position(self) -> int:
+        return self._state.current_position
+
+    @current_position.setter
+    def current_position(self, value: int) -> None:
+        self._state.current_position = value
 
     def consume(self, buffer: str) -> None:
         """
@@ -290,4 +331,9 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self.parsed_data.copy()
+        return self._sorted_copy(self.parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}

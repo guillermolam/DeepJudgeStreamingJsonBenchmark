@@ -4,8 +4,17 @@ Note: MsgPack is a binary format, so this implements JSON parsing
 with MsgPack-inspired compact binary encoding and streaming concepts.
 """
 import json
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, Optional, List
+
+
+@dataclass
+class ParserState:
+    """Holds mutable parser state."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
 
 
 class MsgPackFormatCode(Enum):
@@ -386,8 +395,7 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self._buffer = ""
-        self._parsed_data = {}
+        self._state = ParserState()
 
         # Initialize components
         self._message_extractor = MessageExtractor()
@@ -396,6 +404,18 @@ class StreamingJsonParser:
             self._message_extractor,
             self._message_processor
         )
+
+    @property
+    def _buffer(self) -> str:
+        return self._state.buffer
+
+    @_buffer.setter
+    def _buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def _parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
 
     def consume(self, buffer: str) -> None:
         """
@@ -419,4 +439,9 @@ class StreamingJsonParser:
             Dictionary containing all complete key-value pairs parsed so far
         """
         # Return human-readable data, not binary
-        return self._parsed_data.copy()
+        return self._sorted_copy(self._parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}

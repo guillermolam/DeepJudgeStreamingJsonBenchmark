@@ -4,7 +4,19 @@ Note: FlatBuffers is for binary serialization with zero-copy access,
 so this implements JSON parsing with FlatBuffers-inspired flat memory layout concepts.
 """
 import json
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, List
+
+
+@dataclass
+class ParserState:
+    """Internal state for FlatBuffers parser."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
+    flat_buffer: List[str] = field(default_factory=list)
+    offset_table: Dict[int, int] = field(default_factory=dict)
+    current_offset: int = 0
 
 
 class StreamingJsonParser:
@@ -12,19 +24,55 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self._reset_state()
+        self._state = ParserState()
         self._initialize_flat_buffer()
+
+    @property
+    def buffer(self) -> str:
+        return self._state.buffer
+
+    @buffer.setter
+    def buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
+
+    @property
+    def flat_buffer(self) -> List[str]:
+        return self._state.flat_buffer
+
+    @flat_buffer.setter
+    def flat_buffer(self, value: List[str]) -> None:
+        self._state.flat_buffer = value
+
+    @property
+    def offset_table(self) -> Dict[int, int]:
+        return self._state.offset_table
+
+    @offset_table.setter
+    def offset_table(self, value: Dict[int, int]) -> None:
+        self._state.offset_table = value
+
+    @property
+    def current_offset(self) -> int:
+        return self._state.current_offset
+
+    @current_offset.setter
+    def current_offset(self, value: int) -> None:
+        self._state.current_offset = value
 
     def _reset_state(self) -> None:
         """Reset parser state to initial values."""
-        self.buffer = ""
-        self.parsed_data = {}
+        self._state.buffer = ""
+        self._state.parsed_data.clear()
 
     def _initialize_flat_buffer(self) -> None:
         """Initialize FlatBuffers-style data_gen structures."""
-        self.flat_buffer = []  # Flat representation of data_gen
-        self.offset_table = {}  # Offset table for quick access
-        self.current_offset = 0
+        self._state.flat_buffer = []  # Flat representation of data_gen
+        self._state.offset_table = {}
+        self._state.current_offset = 0
 
     def consume(self, buffer: str) -> None:
         """
@@ -89,7 +137,12 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self.parsed_data.copy()
+        return self._sorted_copy(self.parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}
 
 
 class FlatBufferValidator:

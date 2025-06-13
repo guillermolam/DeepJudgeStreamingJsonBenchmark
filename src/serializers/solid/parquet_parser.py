@@ -5,9 +5,18 @@ with Parquet-inspired columnar processing and metadata handling.
 """
 import json
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
+
+
+@dataclass
+class ParserState:
+    """Holds state for the Parquet parser."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
+    binary_stream: bytearray = field(default_factory=bytearray)
 
 
 class MessagePackType(Enum):
@@ -334,9 +343,23 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self._buffer = ""
-        self._parsed_data = {}
-        self._binary_stream = bytearray()
+        self._state = ParserState()
+
+    @property
+    def _buffer(self) -> str:
+        return self._state.buffer
+
+    @_buffer.setter
+    def _buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def _parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
+
+    @property
+    def _binary_stream(self) -> bytearray:
+        return self._state.binary_stream
 
     def consume(self, buffer: str) -> None:
         """
@@ -359,7 +382,12 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self._parsed_data.copy()
+        return self._sorted_copy(self._parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}
 
     def _update_binary_stream(self, buffer: str) -> None:
         """Update binary stream with new buffer data_gen."""
