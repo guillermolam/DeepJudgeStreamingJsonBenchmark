@@ -1,5 +1,4 @@
-# Create the refactored utils.py file
-refactored_code = '''"""
+"""
 Utility Functions for Streaming JSON Parser Benchmarks
 ======================================================
 
@@ -21,7 +20,7 @@ from tqdm import tqdm
 # Properly declare the TypeVar in __all__
 _T = TypeVar('_T')
 __all__ = ['Timer', 'calculate_throughput', 'calculate_amdahl_speedup', 'calculate_statistics',
-           'format_bytes', 'format_time', 'save_results', 'create_progress_bar', 
+           'format_bytes', 'format_time', 'save_results', 'create_progress_bar',
            'validate_benchmark_results', '_T']
 
 
@@ -47,9 +46,7 @@ class Timer:
     def elapsed_seconds(self) -> float:
         return self.elapsed_ns / 1_000_000_000
 
-    # ----------------------------------------------------------
-    # Context-manager helpers
-    # ----------------------------------------------------------
+
     def start(self) -> "Timer":
         self._start_ns = time.perf_counter_ns()
         return self
@@ -67,9 +64,6 @@ class Timer:
         self.stop()
 
 
-# ──────────────────────────────────────────────────────────────
-# Maths & statistics helpers
-# ──────────────────────────────────────────────────────────────
 def calculate_throughput(data_size_bytes: int, time_ms: float) -> float:
     """Return MB/s given bytes and milliseconds."""
     if time_ms <= 0:
@@ -78,34 +72,31 @@ def calculate_throughput(data_size_bytes: int, time_ms: float) -> float:
     return data_size_mb / (time_ms / 1000)
 
 
-@staticmethod
 def _is_invalid_time_or_processor_count(sequential_time_ms: float, parallel_time_ms: float, num_processors: int) -> bool:
     """Check if time values or processor count are invalid."""
-    return (not math.isfinite(sequential_time_ms) or sequential_time_ms <= 0 or 
+    return (not math.isfinite(sequential_time_ms) or sequential_time_ms <= 0 or
             not math.isfinite(parallel_time_ms) or parallel_time_ms <= 0 or num_processors <= 0)
 
 
-@staticmethod
 def _calculate_parallel_fraction(speedup: float, num_processors: int) -> float:
-    """Calculate parallel fraction using Amdahl's law."""
+    """Calculate a parallel fraction using Amdahl's law."""
     if speedup >= num_processors:
         return 1.0
-    
+
     denominator = (speedup * num_processors) - 1
     if denominator <= 0:
         return 0.0
-    
+
     return max(0.0, ((speedup * num_processors) - num_processors) / denominator)
 
 
-@staticmethod
 def _calculate_theoretical_speedup(parallel_fraction: float, num_processors: int) -> float:
-    """Calculate theoretical speedup based on parallel fraction."""
+    """Calculate theoretical speedup based on a parallel fraction."""
     denominator_theoretical = 1 - parallel_fraction + (parallel_fraction / num_processors)
-    
+
     if abs(denominator_theoretical) < 1e-10:
         return float('inf')
-    
+
     return 1 / denominator_theoretical
 
 
@@ -134,7 +125,6 @@ def calculate_amdahl_speedup(
     }
 
 
-@staticmethod
 def _calculate_median(sorted_values: List[float]) -> float:
     """Calculate median from sorted values."""
     n = len(sorted_values)
@@ -174,18 +164,14 @@ def calculate_statistics(values: Sequence[float]) -> Dict[str, float]:
     }
 
 
-# ──────────────────────────────────────────────────────────────
-# Formatting helpers
-# ──────────────────────────────────────────────────────────────
-@staticmethod
 def _get_appropriate_unit_and_value(num_bytes: int) -> Tuple[float, int]:
     """Get the appropriate unit index and converted value for byte formatting."""
     units = ["B", "KB", "MB", "GB", "TB"]
     value, unit = float(num_bytes), 0
-    
+
     while value >= 1024 and unit < len(units) - 1:
         value, unit = value / 1024, unit + 1
-    
+
     return value, unit
 
 
@@ -193,22 +179,20 @@ def format_bytes(num_bytes: int) -> str:
     """Return *num_bytes* as human-readable string."""
     if num_bytes == 0:
         return "0 B"
-    
+
     units = ["B", "KB", "MB", "GB", "TB"]
     value, unit = _get_appropriate_unit_and_value(num_bytes)
-    
+
     if unit == 0:
         return f"{int(value)} {units[unit]}"
     return f"{value:.2f} {units[unit]}"
 
 
-@staticmethod
 def _is_microsecond_range(time_ms: float) -> bool:
     """Check if time should be displayed in microseconds."""
     return time_ms < 1
 
 
-@staticmethod
 def _is_millisecond_range(time_ms: float) -> bool:
     """Check if time should be displayed in milliseconds."""
     return time_ms < 1000
@@ -218,25 +202,20 @@ def format_time(time_ms: float) -> str:
     """Return *time_ms* as human-readable string."""
     if _is_microsecond_range(time_ms):
         return f"{time_ms * 1000:.1f} μs"
-    
+
     if _is_millisecond_range(time_ms):
         return f"{time_ms:.2f} ms"
-    
+
     return f"{time_ms / 1000:.2f} s"
 
 
-# ──────────────────────────────────────────────────────────────
-# File persistence
-# ──────────────────────────────────────────────────────────────
-@staticmethod
 def _is_csv_format(fmt: str) -> bool:
-    """Check if format is CSV."""
+    """Check if a format is CSV."""
     return fmt.lower() == "csv"
 
 
-@staticmethod
 def _is_json_format(fmt: str) -> bool:
-    """Check if format is JSON."""
+    """Check if the format is JSON."""
     return fmt.lower() == "json"
 
 
@@ -277,9 +256,6 @@ def _save_results_json(results: List[Dict[str, Any]], fp: Path) -> None:
     fp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
 
-# ──────────────────────────────────────────────────────────────
-# Progress-bar helpers
-# ──────────────────────────────────────────────────────────────
 def create_progress_bar(total: int, desc: str = "Progress") -> tqdm[_T] | _SimpleProgressBar:
     """Return a tqdm progress-bar, or a fallback if tqdm is missing."""
     try:
@@ -341,7 +317,6 @@ _REQUIRED_FIELDS: Tuple[str, ...] = (
 )
 
 
-@staticmethod
 def _missing_field_errors(
     idx: int, result: Dict[str, Any], required: Tuple[str, ...]
 ) -> List[str]:
@@ -349,25 +324,21 @@ def _missing_field_errors(
     return [f"Result {idx}: Missing required fields: {missing}"] if missing else []
 
 
-@staticmethod
 def _has_negative_serialize_time(serialize_time: float) -> bool:
     """Check if serialize time is negative."""
     return serialize_time < 0
 
 
-@staticmethod
 def _has_negative_deserialize_time(deserialize_time: float) -> bool:
     """Check if deserialize time is negative."""
     return deserialize_time < 0
 
 
-@staticmethod
 def _has_high_serialize_time(serialize_time: float) -> bool:
     """Check if serialize time is suspiciously high."""
     return serialize_time > 60_000
 
 
-@staticmethod
 def _has_high_deserialize_time(deserialize_time: float) -> bool:
     """Check if deserialize time is suspiciously high."""
     return deserialize_time > 60_000
@@ -385,21 +356,20 @@ def _time_errors_and_warnings(
     # Negative times are always errors
     if _has_negative_serialize_time(serialize):
         errors.append(f"Result {idx}: Negative serialize time: {serialize}")
-    
+
     if _has_negative_deserialize_time(deserialize):
         errors.append(f"Result {idx}: Negative deserialize time: {deserialize}")
 
     # Suspiciously high values are warnings
     if _has_high_serialize_time(serialize):
         warnings.append(f"Result {idx}: High serialize time: {serialize} ms")
-    
+
     if _has_high_deserialize_time(deserialize):
         warnings.append(f"Result {idx}: High deserialize time: {deserialize} ms")
 
     return errors, warnings
 
 
-@staticmethod
 def _calculate_success_rate(successful_count: int, total_count: int) -> float:
     """Calculate success rate percentage."""
     return (successful_count / total_count * 100) if total_count else 0.0
@@ -409,7 +379,7 @@ def _summary(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     successful = [r for r in results if r.get("success")]
     failed = len(results) - len(successful)
     success_rate = _calculate_success_rate(len(successful), len(results))
-    
+
     return {
         "total_results": len(results),
         "successful_results": len(successful),
@@ -421,13 +391,11 @@ def _summary(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
-@staticmethod
 def _has_no_results(results: List[Dict[str, Any]]) -> bool:
-    """Check if results list is empty."""
+    """Check if a result list is empty."""
     return not results
 
 
-@staticmethod
 def _is_successful_result(result: Dict[str, Any]) -> bool:
     """Check if a result is marked as successful."""
     return result.get("success", False)
@@ -487,3 +455,4 @@ print("   - _is_microsecond_range()")
 print("   - _should_print_progress()")
 print("7. Maintained immutability and thread safety")
 print("8. Preserved O(n) complexity - no performance degradation")
+'''

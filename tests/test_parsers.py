@@ -1,65 +1,112 @@
 #!/usr/bin/env python3
 """
-Quick smoke test for all streaming JSON parsers.
-Tests the basic interface and incremental parsing functionality.
+Test script to identify which parsers are working correctly
 """
 
+import importlib
 import pytest
 
-from src.serializers.bson_parser import StreamingJsonParser as BsonParser
-from src.serializers.cbor_parser import StreamingJsonParser as CborParser
-from src.serializers.flatbuffers_parser import StreamingJsonParser as FlatBuffersParser
-# Import all parser classes from the src package
-from src.serializers.json_parser import StreamingJsonParser as JsonParser
-from src.serializers.marshall_parser import StreamingJsonParser as MarshallParser
-from src.serializers.msgpack_parser import StreamingJsonParser as MsgPackParser
-from src.serializers.parquet_parser import StreamingJsonParser as ParquetParser
-from src.serializers.pickle_binary_mono_parser import StreamingJsonParser as PickleMonoParser
-from src.serializers.pickle_binary_multi_parser import StreamingJsonParser as PickleMultiParser
-from src.serializers.protobuf_parser import StreamingJsonParser as ProtobufParser
-from src.serializers.reactivex_parser import StreamingJsonParser as ReactiveXParser
-from src.serializers.ultrajson_parser import StreamingJsonParser as UltraJsonParser
-
-# List of (parser class, human-readable name)
-parsers = [
-    (JsonParser, "JSON Parser"),
-    (MarshallParser, "Marshall Parser"),
-    (PickleMonoParser, "Pickle Binary Mono Parser"),
-    (PickleMultiParser, "Pickle Binary Multi Parser"),
-    (ReactiveXParser, "ReactiveX Parser"),
-    (ProtobufParser, "Protobuf Parser"),
-    (FlatBuffersParser, "FlatBuffers Parser"),
-    (BsonParser, "BSON Parser"),
-    (CborParser, "CBOR Parser"),
-    (UltraJsonParser, "Ultra-JSON Parser"),
-    (MsgPackParser, "MsgPack Parser"),
-    (ParquetParser, "Parquet Parser"),
+# List all eight module names here
+PARSER_MODULES = [
+    "flatbuffers_parser",
+    "msgpack_parser",
+    "bson_parser",
+    "ultrajson_parser",
+    "pickle_parser",
+    "protobuf_parser",
+    "cbor_parser",
+    "parquet_parser",
 ]
 
 
-@pytest.mark.parametrize("parser_class,parser_name", parsers)
-def test_incremental_parsing(parser_class, parser_name):
+@pytest.fixture(params=PARSER_MODULES, ids=lambda m: m.replace("_parser", ""))
+def parser(request):
     """
-    Verify that each parser can consume JSON in chunks
-    and produce a complete result containing the expected keys.
+    Fixture to import StreamingJsonParser from each module in turn.
     """
-    parser = parser_class()
+    mod = importlib.import_module(request.param)
+    return mod.StreamingJsonParser()
 
-    # Chunk 1: partial JSON
-    parser.consume('{"test": "hello"')
-    _ = parser.get()  # intermediate result may be partial
 
-    # Chunk 2: adds another field and starts a third
-    parser.consume(', "complete": "value", "incompl')
-    _ = parser.get()
+def test_init_empty(parser):
+    """
+    After init, get() should return empty dict.
+    """
+    assert parser.get() == {}
 
-    # Chunk 3: completes the JSON
-    parser.consume('ete": "final"}')
+
+def test_complete_json(parser):
+    """
+    A single complete object should be parsed immediately.
+    """
+    parser.consume('{"foo": "bar"}')
+    assert parser.get() == {"foo": "bar"}
+
+
+def test_chunked_streaming(parser):
+    """
+    Parsing across multiple consume() calls.
+    """
+    parser.consume('{"foo": ')
+    parser.consume('"bar"}')
+    assert parser.get() == {"foo": "bar"}
+
+
+def test_partial_string_value(parser):
+    """
+    Partial string values should appear in get() once started.
+    """
+    parser.consume('{"hello": "worl')
+    assert parser.get() == {"hello": "worl"}
+
+
+def test_partial_key_not_returned(parser):
+    """
+    Partial keys must not appear until the colon & value type are seen.
+    """
+    parser.consume('{"par')
+    assert parser.get() == {}
+
+
+def test_multiple_pairs_partial(parser):
+    """
+    Multiple fields, last one partial.
+    """
+    parser.consume('{"a": "1", "b": 2')
+    # depending on implementation, "b":2 may or may not complete;
+    # at minimum "a" must be present:
     result = parser.get()
+    assert result.get("a") == "1"
+    # if b was parsed, it must equal the integer 2
+    if "b" in result:
+        assert result["b"] == 2
 
-    # Validate output
-    expected_keys = {"test", "complete", "incomplete"}
-    assert result is not None, f"{parser_name} returned None"
-    actual_keys = set(result.keys())
-    missing = expected_keys - actual_keys
-    assert not missing, f"{parser_name} missing keys: {missing}"
+
+def test_boolean_and_null(parser):
+    """
+    Booleans and null should be supported once complete.
+    """
+    parser.consume('{"t": true, "f": false, "n": null')
+    result = parser.get()
+    assert result.get("t") is True
+    assert result.get("f") is False
+    assert result.get("n") is None
+
+
+def test_nested_object_complete(parser):
+    """
+    A nested object, complete at the end.
+    """
+    parser.consume('{"outer": {"inner": "value"}}')
+    assert parser.get() == {"outer": {"inner": "value"}}
+
+
+def test_nested_object_partial(parser):
+    """
+    Nested object partially streamed: inner value incomplete.
+    """
+    parser.consume('{"outer": {"inner": "val')
+    # Should at least have the outer key with partial inner
+    result = parser.get()
+    assert "outer" in result and isinstance(result["outer"], dict)
+    assert result["outer"].get("inner") == "val"

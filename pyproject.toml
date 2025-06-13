@@ -108,6 +108,9 @@ extend-exclude = '''
   | dist
 )/
 '''
+[tool.streaming-benchmark]
+parser_root = "src/serializers"
+max_depth = 3
 
 [tool.isort]
 profile = "black"

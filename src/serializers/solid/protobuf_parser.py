@@ -217,7 +217,7 @@ class ProtobufStyleProcessor:
                 break
 
             # Extract a message of specified length
-            message_bytes = self._frame_parser.extract_message(message_length)
+            message_bytes = self._frame_parser.extract_message(self._message_buffer, message_length)
 
             if message_bytes is None:
                 break  # Not enough data_gen for a complete message

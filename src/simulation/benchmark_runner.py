@@ -18,6 +18,7 @@ import tracemalloc
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Timer
 from typing import Dict, List, Any, Optional, Protocol
 
 import psutil
@@ -363,12 +364,12 @@ class BenchmarkResultsManager:
 
         if format_type in ['csv', 'both']:
             csv_file = self.output_dir / f"benchmark_results_{timestamp}.csv"
-            save_results(self.results, csv_file, 'csv')
+            self.save_results(self.results)
             print(f"📊 Results saved to: {csv_file}")
 
         if format_type in ['json', 'both']:
             json_file = self.output_dir / f"benchmark_results_{timestamp}.json"
-            save_results(self.results, json_file, 'json')
+            self.save_results(self.results)
             print(f"📊 Results saved to: {json_file}")
 
     def print_summary(self, dataset_sizes: List[int]) -> None:
@@ -458,7 +459,7 @@ class StreamingParserBenchmark:
         print(f"\n✅ Benchmark completed! {len(self.results_manager.results)} test results collected.")
 
     def _calculate_total_tests(self) -> int:
-        """Calculate total number of tests to run."""
+        """Calculate the total number of tests to run."""
         return (len(self.parsers) * len(self.test_data) *
                 self.config.runs_per_test * len(self.config.protocols))
 
@@ -532,7 +533,7 @@ def _sanitize_output_dir(output_arg: str) -> Path:
 
     Resolves the provided path, forbidding path traversal attempts that
     escape the current working directory. If a path outside the current
-    working directory is requested, a ``ValueError`` is raised.
+    working directory is requested, a ValueError is raised.
 
     Parameters
     ----------
@@ -542,7 +543,7 @@ def _sanitize_output_dir(output_arg: str) -> Path:
     Returns
     -------
     Path
-        A safe, absolute ``Path`` inside the current working directory.
+        A safe, absolute Path inside the current working directory.
     """
     base_dir = Path.cwd().resolve()
     candidate = Path(output_arg).expanduser()

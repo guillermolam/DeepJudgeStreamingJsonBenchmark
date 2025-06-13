@@ -29,6 +29,7 @@ from tqdm import tqdm
 from simulation.algo_metadata import ALGORITHM_METADATA
 from simulation.data_gen import generate_test_data, create_streaming_chunks
 from simulation.net_sim import HTTPSimulator, TCPSimulator, TelnetSimulator
+from simulation.utils import Timer, calculate_throughput, calculate_amdahl_speedup, save_results
 
 
 def sanitize_output_path(base_path: str, user_path: str, subdir_allowed: bool = True) -> str:

@@ -269,7 +269,7 @@ class DataGenerator:
         self._field_counter = FieldCounter(num_fields)
         self._config = config
         self._value_generator = ValueGenerator(config.DEFAULT_STRING_VALUES)
-        self._nested_generator = NestedObjectGenerator(2, self._field_counter)
+        self._nested_generator = NestedObjectGenerator(self._value_generator, self._field_counter)
         self._array_generator = ArrayGenerator(self._value_generator)
         self._simple_generator = SimpleFieldGenerator(self._value_generator)
         self._metadata_generator = MetadataGenerator()
@@ -547,7 +547,7 @@ def validate_generated_data(val_data_gen: Dict[str, Any], expected_fields: int) 
 if __name__ == "__main__":
     """
     Demo script showing data_gen generator capabilities.
-    
+
     This is a demonstration of the data_gen generator functionality.
     For comprehensive testing, run the test suite: pytest tests/simulation/test_data_gen.py
     """

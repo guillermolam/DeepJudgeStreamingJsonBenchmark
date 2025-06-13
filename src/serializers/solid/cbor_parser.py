@@ -490,7 +490,7 @@ class JsonReconstructor:
         elif major_type in [0, 1, 7]:  # numbers, booleans, null
             return JsonReconstructor._format_primitive_value(value)
         else:
-            return token.get('raw', '')
+            return token.get('../raw', '')
 
     @staticmethod
     def _format_primitive_value(value: Any) -> str:
