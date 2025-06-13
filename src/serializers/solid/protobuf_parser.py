@@ -5,7 +5,16 @@ with Protobuf-inspired message framing and incremental decoding.
 """
 import json
 import struct
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+
+
+@dataclass
+class ParserState:
+    """State for the Protobuf parser."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
 
 
 class PairExtractor:
@@ -235,9 +244,20 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self._buffer = ""
-        self._parsed_data = {}
+        self._state = ParserState()
         self._processor = ProtobufStyleProcessor()
+
+    @property
+    def _buffer(self) -> str:
+        return self._state.buffer
+
+    @_buffer.setter
+    def _buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def _parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
 
     def consume(self, buffer: str) -> None:
         """
@@ -260,4 +280,9 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self._parsed_data.copy()
+        return self._sorted_copy(self._parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}

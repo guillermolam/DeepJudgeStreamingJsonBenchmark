@@ -4,6 +4,7 @@ Uses ujson-inspired high-performance parsing techniques for streaming JSON.
 """
 import json
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
@@ -11,15 +12,44 @@ from typing import Any, Dict, Optional, Tuple
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 
+@dataclass
+class ParserState:
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
+    fast_buffer: bytearray = field(default_factory=bytearray)
+    parse_position: int = 0
+
+
 class StreamingJsonParser:
     """Streaming JSON parser with Ultra-JSON inspired high-performance techniques."""
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self.buffer = ""
-        self.parsed_data = {}
-        self.fast_buffer = bytearray()
-        self.parse_position = 0
+        self._state = ParserState()
+
+    @property
+    def buffer(self) -> str:
+        return self._state.buffer
+
+    @buffer.setter
+    def buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
+
+    @property
+    def fast_buffer(self) -> bytearray:
+        return self._state.fast_buffer
+
+    @property
+    def parse_position(self) -> int:
+        return self._state.parse_position
+
+    @parse_position.setter
+    def parse_position(self, value: int) -> None:
+        self._state.parse_position = value
 
     def consume(self, buffer: str) -> None:
         """
@@ -43,7 +73,12 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self.parsed_data.copy()
+        return self._sorted_copy(self.parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}
 
     @staticmethod
     def _convert_to_bytes(buffer: str) -> bytearray:

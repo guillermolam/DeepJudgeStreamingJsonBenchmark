@@ -4,7 +4,17 @@ Note: CBOR is a binary format, so this implements JSON parsing
 with CBOR-inspired compact encoding and streaming concepts.
 """
 import json
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, List
+
+
+@dataclass
+class ParserState:
+    """Internal mutable state for the CBOR parser."""
+
+    buffer: str = ""
+    parsed_data: Dict[str, Any] = field(default_factory=dict)
+    compact_buffer: List[str] = field(default_factory=list)
 
 
 class StreamingJsonParser:
@@ -12,14 +22,34 @@ class StreamingJsonParser:
 
     def __init__(self):
         """Initialize the streaming JSON parser."""
-        self._reset_state()
+        self._state = ParserState()
         self._initialize_cbor_types()
+
+    @property
+    def buffer(self) -> str:
+        return self._state.buffer
+
+    @buffer.setter
+    def buffer(self, value: str) -> None:
+        self._state.buffer = value
+
+    @property
+    def parsed_data(self) -> Dict[str, Any]:
+        return self._state.parsed_data
+
+    @property
+    def compact_buffer(self) -> List[str]:
+        return self._state.compact_buffer
+
+    @compact_buffer.setter
+    def compact_buffer(self, value: List[str]) -> None:
+        self._state.compact_buffer = value
 
     def _reset_state(self) -> None:
         """Reset parser state to initial values."""
-        self.buffer = ""
-        self.parsed_data = {}
-        self.compact_buffer = []
+        self._state.buffer = ""
+        self._state.parsed_data.clear()
+        self._state.compact_buffer.clear()
 
     def _initialize_cbor_types(self) -> None:
         """Initialize CBOR major type mappings."""
@@ -89,7 +119,12 @@ class StreamingJsonParser:
         Returns:
             Dictionary containing all complete key-value pairs parsed so far
         """
-        return self.parsed_data.copy()
+        return self._sorted_copy(self.parsed_data)
+
+    @staticmethod
+    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Return a dict sorted by keys for deterministic output."""
+        return {k: data[k] for k in sorted(data.keys())}
 
 
 class CborTokenizer:
