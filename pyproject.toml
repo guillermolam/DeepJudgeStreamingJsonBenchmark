@@ -153,7 +153,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
-pythonpath = ["src"]
+pythonpath = [
+    "src/serializers/raw", # ← raw implementation
+    "src/serializers/solid"                  # ← solid implementation
+]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
@@ -164,6 +167,7 @@ markers = [
     "unit: marks tests as unit tests",
     "benchmark: marks tests as benchmark tests",
 ]
+
 
 [tool.coverage.run]
 source = ["serializers", "simulation"]

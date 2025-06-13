@@ -1,8 +1,7 @@
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
-
+from typing import Any, Dict, List, Optional, Union
 
 @dataclass(frozen=True)
 class CborToken:
@@ -11,23 +10,43 @@ class CborToken:
     value: Any
     raw: str
 
+
+class _TokenizeState:
+    __slots__ = ('in_string', 'escape')
+
+    def __init__(self):
+        self.in_string = False
+        self.escape = False
+
 class CborTokenizer:
     """Tokenizes JSON text into CBOR-style tokens."""
 
     @staticmethod
     def tokenize(buffer: str) -> List[CborToken]:
         tokens: List[CborToken] = []
-        current = []  # type: List[str]
+        current: List[str] = []
         state = _TokenizeState()
         for ch in buffer:
-            if CborTokenizer._handle_escape(ch, current, state):
+            if state.escape:
+                current.append(ch)
+                state.escape = False
+                continue
+            if ch == '\\':
+                current.append(ch)
+                state.escape = True
                 continue
             if state.in_string:
-                if CborTokenizer._process_in_string(ch, current, state):
+                current.append(ch)
+                if ch == '"' and not state.escape:
+                    state.in_string = False
                     tokens.append(CborTokenizer._classify(''.join(current)))
                     current.clear()
                 continue
-            if CborTokenizer._is_delimiter(ch):
+            if ch == '"':
+                current.append(ch)
+                state.in_string = True
+                continue
+            if ch in '{}[],: \n\r\t':
                 CborTokenizer._flush_current(current, tokens)
                 if ch in '{}[],:':
                     tokens.append(CborToken('structural', ch, ch))
@@ -35,30 +54,6 @@ class CborTokenizer:
                 current.append(ch)
         CborTokenizer._flush_current(current, tokens)
         return tokens
-
-    @staticmethod
-    def _handle_escape(ch: str, current: List[str], state: '_TokenizeState') -> bool:
-        if state.escape:
-            current.append(ch)
-            state.escape = False
-            return True
-        if ch == '\\':
-            current.append(ch)
-            state.escape = True
-            return True
-        return False
-
-    @staticmethod
-    def _process_in_string(ch: str, current: List[str], state: '_TokenizeState') -> bool:
-        current.append(ch)
-        if ch == '"' and not state.escape:
-            state.in_string = False
-            return True
-        return False
-
-    @staticmethod
-    def _is_delimiter(ch: str) -> bool:
-        return ch in '{}[],: \n\r\t'
 
     @staticmethod
     def _flush_current(current: List[str], tokens: List[CborToken]) -> None:
@@ -89,28 +84,25 @@ class CborTokenizer:
         # Default: bare text
         return CborToken(3, token, token)
 
-
-class _TokenizeState:
-    __slots__ = ('in_string', 'escape')
-
-    def __init__(self):
-        self.in_string = False
-        self.escape = False
-
-
 class CborProcessor:
-    """Processes CBOR-style tokens into JSON objects."""
+    """Processes CBOR-style tokens into JSON objects with partial support."""
 
     @staticmethod
     def process(tokens: List[CborToken]) -> Dict[str, Any]:
         result: Dict[str, Any] = {}
         for start in CborProcessor._map_starts(tokens):
             end = CborProcessor._find_map_end(tokens, start)
-            if end == -1:
-                continue
-            obj = CborProcessor._parse_segment(tokens[start:end + 1])
-            if obj:
-                result.update(obj)
+            if end >= start:
+                segment = tokens[start:end + 1]
+                obj = CborProcessor._parse_segment(segment)
+                if obj:
+                    result.update(obj)
+            else:
+                # Partial map: extract whatever pairs we can
+                segment = tokens[start:]
+                partial = CborProcessor._partial_parse(segment)
+                if partial:
+                    result.update(partial)
         return result
 
     @staticmethod
@@ -129,26 +121,19 @@ class CborProcessor:
 
     @staticmethod
     def _parse_segment(segment: List[CborToken]) -> Optional[Dict[str, Any]]:
-        json_str = CborProcessor._tokens_to_json(segment)
+        s = ''.join(
+            t.raw if t.raw in '{}[],: ' else CborProcessor._value_literal(t)
+            for t in segment
+        )
+        s = CborProcessor._repair_json(s)
         try:
-            obj = json.loads(json_str)
+            obj = json.loads(s)
             return obj if isinstance(obj, dict) else None
         except json.JSONDecodeError:
-            return CborProcessor._parse_partial(segment)
+            return CborProcessor._partial_parse(segment)
 
     @staticmethod
-    def _tokens_to_json(tokens: List[CborToken]) -> str:
-        parts: List[str] = []
-        for t in tokens:
-            if t.raw in '{}[],:':
-                parts.append(t.raw)
-            else:
-                parts.append(CborProcessor._value_to_literal(t))
-        joined = ''.join(parts)
-        return CborProcessor._repair_json(joined)
-
-    @staticmethod
-    def _value_to_literal(token: CborToken) -> str:
+    def _value_literal(token: CborToken) -> str:
         if token.value is None:
             return 'null'
         if isinstance(token.value, bool):
@@ -165,47 +150,33 @@ class CborProcessor:
         return s
 
     @staticmethod
-    def _parse_partial(tokens: List[CborToken]) -> Optional[Dict[str, Any]]:
-        pairs = CborProcessor._extract_pairs(tokens)
-        return pairs or None
-
-    @staticmethod
-    def _extract_pairs(tokens: List[CborToken]) -> Dict[str, Any]:
+    def _partial_parse(tokens: List[CborToken]) -> Optional[Dict[str, Any]]:
         result: Dict[str, Any] = {}
-        idx = 1
-        while idx < len(tokens) - 1:
-            key, idx = CborProcessor._extract_key(tokens, idx)
-            if key is None:
-                break
-            value, idx = CborProcessor._extract_value(tokens, idx)
-            if value is None:
-                break
-            result[key] = value
-        return result
-
-    @staticmethod
-    def _extract_key(tokens: List[CborToken], idx: int) -> Tuple[Optional[str], int]:
-        t = tokens[idx]
-        if t.major_type == 3:
-            key = t.value
-            # skip key and following colon
-            return key, idx + 2 if idx + 1 < len(tokens) and tokens[idx + 1].value == ':' else idx + 1
-        return None, idx + 1
-
-    @staticmethod
-    def _extract_value(tokens: List[CborToken], idx: int) -> Tuple[Optional[Any], int]:
-        if idx >= len(tokens) or tokens[idx].value in ('}', ','):
-            return None, idx + 1
-        val = tokens[idx].value
-        idx += 1
-        # skip comma
-        if idx < len(tokens) and tokens[idx].value == ',':
-            idx += 1
-        return val, idx
-
+        i = 1  # skip opening '{'
+        while i < len(tokens):
+            t = tokens[i]
+            if t.major_type == 3:
+                key = t.value
+                i += 1
+                if i < len(tokens) and tokens[i].value == ':':
+                    i += 1
+                    if i < len(tokens):
+                        val_tok = tokens[i]
+                        if val_tok.value == '{':
+                            # nested partial object
+                            nested = CborProcessor._partial_parse(tokens[i:]) or {}
+                            result[key] = nested
+                        else:
+                            result[key] = val_tok.value
+                        i += 1
+                        if i < len(tokens) and tokens[i].value == ',':
+                            i += 1
+                        continue
+            i += 1
+        return result or None
 
 class StreamingJsonParser:
-    """CBOR-inspired streaming JSON parser."""
+    """CBOR-inspired streaming JSON parser supporting partial fragments."""
 
     def __init__(self):
         self._buffer: str = ''
@@ -213,14 +184,15 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Consume a JSON text chunk and update parsed data.
+        Consume a JSON text chunk and update parsed data, including partial values.
         """
         self._buffer += buffer
         tokens = CborTokenizer.tokenize(self._buffer)
-        self._data.update(CborProcessor.process(tokens))
+        pairs = CborProcessor.process(tokens)
+        self._data.update(pairs)
 
     def get(self) -> Dict[str, Any]:
         """
-        Return all parsed key-value pairs.
+        Return all parsed key-value pairs, complete or partial.
         """
         return dict(self._data)
