@@ -21,10 +21,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using BSON-style processing.
+        Process a chunk of JSON data_gen incrementally using BSON-style processing.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self.buffer += buffer
         self._add_to_binary_buffer(buffer)
@@ -45,7 +45,7 @@ class StreamingJsonParser:
                 break
 
     def _has_remaining_data(self) -> bool:
-        """Check if there's remaining data to process."""
+        """Check if there's remaining data_gen to process."""
         return self.current_position < len(self.binary_buffer)
 
     def _try_read_document_length(self) -> bool:
@@ -104,7 +104,7 @@ class StreamingJsonParser:
             remaining_str = self._get_remaining_string()
             self._extract_json_documents(remaining_str)
             self._clear_processed_data()
-        except Exception:
+        except ValueError:
             pass
 
     def _get_remaining_string(self) -> str:
@@ -112,7 +112,7 @@ class StreamingJsonParser:
         return self.binary_buffer[self.current_position:].decode('utf-8', errors='ignore')
 
     def _clear_processed_data(self) -> None:
-        """Clear processed binary data."""
+        """Clear processed binary data_gen."""
         self.binary_buffer.clear()
         self.current_position = 0
 
@@ -137,7 +137,7 @@ class StreamingJsonParser:
             doc_str = doc_bytes.decode('utf-8', errors='replace')
             if '{' in doc_str:
                 self._extract_json_documents(doc_str)
-        except Exception:
+        except ValueError:
             pass
 
     def _extract_json_documents(self, text: str) -> None:

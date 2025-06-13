@@ -202,19 +202,19 @@ class ObserverManager:
         for observer in self._observers:
             try:
                 observer(event_type, data)
-            except Exception:
+            except ValueError:
                 continue  # Don't let observer errors break the stream
 
 
 class StreamDataManager:
-    """Manages stream data and events."""
+    """Manages stream data_gen and events."""
 
     def __init__(self):
         self._data_stream = []
         self._subject_lock = threading.Lock()
 
     def add_event(self, event_type: str, data: Any) -> None:
-        """Add event to data stream."""
+        """Add event to data_gen stream."""
         with self._subject_lock:
             self._data_stream.append(StreamEvent(
                 event_type=event_type,
@@ -223,25 +223,25 @@ class StreamDataManager:
             ))
 
     def get_stream_copy(self) -> List[StreamEvent]:
-        """Get a thread-safe copy of data stream."""
+        """Get a thread-safe copy of data_gen stream."""
         with self._subject_lock:
             return self._data_stream.copy()
 
 
 class ParsedDataManager:
-    """Thread-safe management of parsed data."""
+    """Thread-safe management of parsed data_gen."""
 
     def __init__(self):
         self._parsed_data = {}
         self._data_lock = threading.Lock()
 
     def update_data(self, new_data: Dict[str, Any]) -> None:
-        """Thread-safe data update."""
+        """Thread-safe data_gen update."""
         with self._data_lock:
             self._parsed_data.update(new_data)
 
     def get_data_copy(self) -> Dict[str, Any]:
-        """Get a thread-safe copy of parsed data."""
+        """Get a thread-safe copy of parsed data_gen."""
         with self._data_lock:
             return self._parsed_data.copy()
 
@@ -266,7 +266,7 @@ class ReactiveStreamProcessor:
         self._observer_manager.notify_observers('buffer_change', new_data)
 
     def process_reactive_stream(self, buffer: str) -> None:
-        """Process the data stream using reactive patterns."""
+        """Process the data_gen stream using reactive patterns."""
         # Transform stream: buffer -> JSON chunks -> parsed objects
         json_chunks = self._chunk_transformer.transform_to_json_chunks(buffer)
         parsed_objects = self._object_transformer.transform_to_parsed_objects(json_chunks)
@@ -291,7 +291,7 @@ class ReactiveStreamProcessor:
         self._observer_manager.subscribe(observer)
 
     def get_parsed_data(self) -> Dict[str, Any]:
-        """Get current parsed data."""
+        """Get current parsed data_gen."""
         return self._data_manager.get_data_copy()
 
 
@@ -322,10 +322,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using reactive patterns.
+        Process a chunk of JSON data_gen incrementally using reactive patterns.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._buffer += buffer
 

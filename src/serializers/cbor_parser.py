@@ -36,16 +36,16 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using CBOR-style processing.
+        Process a chunk of JSON data_gen incrementally using CBOR-style processing.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._append_to_buffer(buffer)
         self._process_buffer()
 
     def _append_to_buffer(self, buffer: str) -> None:
-        """Append new data to internal buffer."""
+        """Append new data_gen to internal buffer."""
         self.buffer += buffer
 
     def _process_buffer(self) -> None:
@@ -58,11 +58,11 @@ class StreamingJsonParser:
         return self._tokenize_cbor_style()
 
     def _update_parsed_data(self, tokens: List[Dict[str, Any]]) -> None:
-        """Update parsed data with new tokens."""
+        """Update parsed data_gen with new tokens."""
         self._process_cbor_tokens(tokens)
 
     def _tokenize_cbor_style(self) -> List[Dict[str, Any]]:
-        """Tokenize buffer into CBOR-style data items."""
+        """Tokenize buffer into CBOR-style data_gen items."""
         tokenizer = CborTokenizer(self.buffer)
         return tokenizer.tokenize()
 
@@ -359,7 +359,7 @@ class TokenClassifier:
 
 
 class CborTokenProcessor:
-    """Processes CBOR tokens into structured data."""
+    """Processes CBOR tokens into structured data_gen."""
 
     def extract_maps(self, tokens: List[Dict[str, Any]]) -> List[Optional[Dict[str, Any]]]:
         """Extract all maps from tokens."""
@@ -587,7 +587,7 @@ class PartialMapReconstructor:
 
 
 class CborValidator:
-    """Validates CBOR data structures."""
+    """Validates CBOR data_gen structures."""
 
     def extract_complete_pairs(self, obj: Dict[str, Any]) -> Dict[str, Any]:
         """Extract complete key-value pairs with CBOR-style validation."""

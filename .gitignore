@@ -4,5 +4,4 @@
 *.pyc
 *.pyo
 *.pyclass
-*.pyo
 __pycache__

@@ -21,7 +21,8 @@ class PairExtractor:
 
         return complete_pairs
 
-    def _is_valid_protobuf_field(self, key: str) -> bool:
+    @staticmethod
+    def _is_valid_protobuf_field(key: str) -> bool:
         """Protobuf-style field validation."""
         return isinstance(key, str) and len(key) > 0
 
@@ -32,8 +33,9 @@ class MessageFrameParser:
     def __init__(self):
         self._current_message_length = None
 
-    def try_parse_length_prefixed(self, message_buffer: bytearray) -> Optional[int]:
-        """Try to parse length-prefixed message."""
+    @staticmethod
+    def try_parse_length_prefixed(message_buffer: bytearray) -> Optional[int]:
+        """Try to parse a length-prefixed message."""
         if len(message_buffer) >= 4:
             try:
                 length = struct.unpack('>I', message_buffer[:4])[0]
@@ -42,8 +44,9 @@ class MessageFrameParser:
                 return None
         return None
 
-    def extract_message(self, message_buffer: bytearray, length: int) -> Optional[bytearray]:
-        """Extract message of specified length."""
+    @staticmethod
+    def extract_message(message_buffer: bytearray, length: int) -> Optional[bytearray]:
+        """Extract a message of specified length."""
         if len(message_buffer) >= length + 4:  # +4 for length prefix
             message_bytes = message_buffer[4:4 + length]
             # Remove processed bytes
@@ -84,7 +87,7 @@ class MessageDecoder:
             if '{' in message_str:
                 return self._extract_json_objects(message_str)
 
-        except Exception:
+        except ValueError:
             pass
 
         return {}
@@ -131,7 +134,7 @@ class MessageDecoder:
             if '{' in segment:
                 return self._extract_partial_json(segment)
 
-        except Exception:
+        except ValueError:
             pass
 
         return {}
@@ -175,7 +178,7 @@ class JsonFallbackParser:
             fake_message = buffer_str.encode('utf-8')
             return self._message_decoder.decode_message(bytearray(fake_message))
 
-        except Exception:
+        except ValueError:
             return {}
 
 
@@ -213,11 +216,11 @@ class ProtobufStyleProcessor:
                     parsed_data.update(fallback_data)
                 break
 
-            # Extract message of specified length
-            message_bytes = self._frame_parser.extract_message(self._message_buffer, message_length)
+            # Extract a message of specified length
+            message_bytes = self._frame_parser.extract_message(message_length)
 
             if message_bytes is None:
-                break  # Not enough data for complete message
+                break  # Not enough data_gen for a complete message
 
             # Process message
             message_data = self._message_decoder.decode_message(message_bytes)
@@ -238,10 +241,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using Protobuf-style framing.
+        Process a chunk of JSON data_gen incrementally using Protobuf-style framing.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._buffer += buffer
 

@@ -34,7 +34,7 @@ class NetworkSimulator:
         return max(0.1, latency)  # Minimum 0.1 ms latency
 
     def simulate_transmission(self, chunks: List[bytes]) -> TransmissionResult:
-        """Simulate the transmission of data chunks."""
+        """Simulate the transmission of data_gen chunks."""
         raise NotImplementedError("Subclasses must implement simulate_transmission")
 
 
@@ -92,7 +92,7 @@ class HTTPSimulator(NetworkSimulator):
             transmitted_chunks.append(chunk_header)
             overhead_bytes += len(chunk_header)
 
-            # Add actual chunk data
+            # Add actual chunk data_gen
             transmitted_chunks.append(chunk)
 
             # Add chunk footer
@@ -145,7 +145,7 @@ class TCPSimulator(NetworkSimulator):
         """Create a TCP packet with headers."""
         return {
             'sequence_number': seq_num,
-            'data': data,
+            'data_gen': data,
             'tcp_header': b'T' * self.tcp_header_size,  # Simulated TCP header
             'ip_header': b'I' * self.ip_header_size,  # Simulated IP header
             'total_size': len(data) + self.tcp_header_size + self.ip_header_size
@@ -155,7 +155,7 @@ class TCPSimulator(NetworkSimulator):
         """Create a TCP ACK packet."""
         return {
             'ack_number': ack_num,
-            'data': b'',
+            'data_gen': b'',
             'tcp_header': b'A' * self.tcp_header_size,
             'ip_header': b'I' * self.ip_header_size,
             'total_size': self.tcp_header_size + self.ip_header_size,
@@ -171,10 +171,10 @@ class TCPSimulator(NetworkSimulator):
         seq_num = 1000  # Starting sequence number
         packet_count = 0
 
-        # Combine all chunks into a single data stream
+        # Combine all chunks into a single data_gen stream
         data_stream = b''.join(chunks)
 
-        # Split data into TCP packets based on MTU
+        # Split data_gen into TCP packets based on MTU
         max_data_per_packet = self.mtu - self.tcp_header_size - self.ip_header_size
 
         for i in range(0, len(data_stream), max_data_per_packet):
@@ -183,8 +183,8 @@ class TCPSimulator(NetworkSimulator):
             # Create a TCP packet
             packet = self._create_tcp_packet(packet_data, seq_num)
 
-            # Add packet data to transmitted chunks
-            transmitted_chunks.append(packet['data'])
+            # Add packet data_gen to transmitted chunks
+            transmitted_chunks.append(packet['data_gen'])
 
             # Track overhead
             overhead_bytes += self.tcp_header_size + self.ip_header_size
@@ -270,7 +270,7 @@ class TelnetSimulator(NetworkSimulator):
                 overhead_bytes += len(cmd)
                 total_latency += self._add_latency()
 
-        # Combine all chunks into a single data stream
+        # Combine all chunks into a single data_gen stream
         data_stream = b''.join(chunks)
 
         # Simulate character-by-character transmission
@@ -323,7 +323,7 @@ def benchmark_network_simulators():
     print("Benchmarking Network Simulators")
     print("=" * 40)
 
-    # Test data
+    # Test data_gen
     test_data = b"Hello, World! " * 100  # 1400 bytes
     chunks = [test_data[i:i + 100] for i in range(0, len(test_data), 100)]
 

@@ -13,7 +13,7 @@ from simulation.data_gen import (
 class TestDataGen:
     @pytest.mark.parametrize("num_fields", [1, 10, 100, 1000])
     def test_generate_test_data(self, num_fields: int):
-        """Test generating JSON data with various field counts."""
+        """Test generating JSON data_gen with various field counts."""
         data = generate_test_data(num_fields)
 
         # Basic type and structure checks
@@ -26,7 +26,7 @@ class TestDataGen:
         json_str = json.dumps(data)
         assert len(json_str) > 0
 
-        # Verify data can be parsed back
+        # Verify data_gen can be parsed back
         parsed_data = json.loads(json_str)
         assert parsed_data == data
 
@@ -55,12 +55,12 @@ class TestDataGen:
         custom_chunks = create_streaming_chunks(json_bytes, chunk_size=chunk_size)
         assert all(len(chunk) <= chunk_size for chunk in custom_chunks)
 
-        # Test with chunk size larger than data
+        # Test with chunk size larger than data_gen
         large_chunks = create_streaming_chunks(json_bytes, chunk_size=len(json_bytes) * 2)
         assert len(large_chunks) == 1
 
     def test_generate_mixed_complexity_data(self):
-        """Test generating mixed complexity data."""
+        """Test generating mixed complexity data_gen."""
         num_fields = 100
         data = generate_mixed_complexity_data(num_fields)
 
@@ -99,7 +99,7 @@ class TestDataGen:
         """Test that the same seed produces the same output."""
         num_fields = 50
 
-        # Generate data twice with the same parameters
+        # Generate data_gen twice with the same parameters
         data1 = generate_test_data(num_fields)
         data2 = generate_test_data(num_fields)
 
@@ -121,7 +121,7 @@ class TestDataGen:
         (0, 0, True),  # Zero fields
     ])
     def test_validate_generated_data(self, input_fields: int, expected_fields: int, tolerance: bool):
-        """Test validation of generated data with various field counts."""
+        """Test validation of generated data_gen with various field counts."""
         data = generate_test_data(input_fields)
         is_valid = validate_generated_data(data, expected_fields)
 

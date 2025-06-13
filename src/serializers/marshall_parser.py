@@ -17,10 +17,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally.
+        Process a chunk of JSON data_gen incrementally.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._buffer += buffer
         self._process_buffer()
@@ -86,7 +86,7 @@ class StreamingJsonParser:
             return None
 
     def _merge_complete_pairs(self, obj: Dict[str, Any]) -> None:
-        """Merge complete key-value pairs into parsed data."""
+        """Merge complete key-value pairs into parsed data_gen."""
         complete_pairs = self._extract_valid_pairs(obj)
         self._parsed_data.update(complete_pairs)
 

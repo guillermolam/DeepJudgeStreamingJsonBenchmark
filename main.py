@@ -29,7 +29,6 @@ from tqdm import tqdm
 from simulation.algo_metadata import ALGORITHM_METADATA
 from simulation.data_gen import generate_test_data, create_streaming_chunks
 from simulation.net_sim import HTTPSimulator, TCPSimulator, TelnetSimulator
-from simulation.utils import Timer, calculate_throughput, calculate_amdahl_speedup, save_results
 
 
 def sanitize_output_path(base_path: str, user_path: str, subdir_allowed: bool = True) -> str:
@@ -310,7 +309,7 @@ class SingleRunBenchmark:
     def _update_metrics(metrics: BenchmarkMetrics, serialize_timer: Timer,
                         deserialize_timer: Timer, cpu_time: float, memory_current: int,
                         memory_peak: int, dataset: TestDataset, result: Any) -> None:
-        """Update metrics with collected data."""
+        """Update metrics with collected data_gen."""
         total_time = serialize_timer.elapsed_ms + deserialize_timer.elapsed_ms
         throughput = calculate_throughput(dataset.size_bytes, total_time)
 

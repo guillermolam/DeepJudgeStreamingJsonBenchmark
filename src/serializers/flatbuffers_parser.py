@@ -21,23 +21,23 @@ class StreamingJsonParser:
         self.parsed_data = {}
 
     def _initialize_flat_buffer(self) -> None:
-        """Initialize FlatBuffers-style data structures."""
-        self.flat_buffer = []  # Flat representation of data
+        """Initialize FlatBuffers-style data_gen structures."""
+        self.flat_buffer = []  # Flat representation of data_gen
         self.offset_table = {}  # Offset table for quick access
         self.current_offset = 0
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using FlatBuffers-style layout.
+        Process a chunk of JSON data_gen incrementally using FlatBuffers-style layout.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._append_to_buffer(buffer)
         self._process_buffer()
 
     def _append_to_buffer(self, buffer: str) -> None:
-        """Append new data to internal buffer."""
+        """Append new data_gen to internal buffer."""
         self.buffer += buffer
 
     def _process_buffer(self) -> None:
@@ -50,7 +50,7 @@ class StreamingJsonParser:
         self._parse_from_flat_buffer()
 
     def _build_flat_representation(self) -> None:
-        """Build flat representation of the JSON data."""
+        """Build flat representation of the JSON data_gen."""
         tokens = self._create_tokens()
         self._add_tokens_to_flat_buffer(tokens)
 
@@ -209,7 +209,7 @@ class FlatBufferTokenizer:
 
 
 class FlatBufferProcessor:
-    """Processes FlatBuffer tokens into structured data."""
+    """Processes FlatBuffer tokens into structured data_gen."""
 
     def __init__(self, flat_buffer: List[str]):
         self.flat_buffer = flat_buffer

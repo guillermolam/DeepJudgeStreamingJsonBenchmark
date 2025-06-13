@@ -39,7 +39,7 @@ ALGORITHM_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Binary serialization format, more compact than JSON',
         'strengths': ['Compact binary format', 'Fast', 'Cross-language'],
         'weaknesses': ['Not human-readable', 'Format conversion overhead'],
-        'best_use_case': 'Network protocols, data storage'
+        'best_use_case': 'Network protocols, data_gen storage'
     },
 
     'pickle_binary_mono_parser': {
@@ -135,7 +135,7 @@ ALGORITHM_METADATA: Dict[str, Dict[str, Any]] = {
         'time_complexity': 'O(n)',
         'space_complexity': 'O(1)',
         'overall_complexity': 'O(n) time, O(1) space - reactive streaming',
-        'description': 'Reactive Extensions for streaming data processing',
+        'description': 'Reactive Extensions for streaming data_gen processing',
         'strengths': ['True streaming', 'Constant memory', 'Reactive patterns'],
         'weaknesses': ['Complex programming model', 'Learning curve'],
         'best_use_case': 'Real-time streaming, event processing'
@@ -143,18 +143,18 @@ ALGORITHM_METADATA: Dict[str, Dict[str, Any]] = {
 }
 
 
-def get_algorithm_info(parser_name: str) -> Dict[str, Any]:
+def get_algorithm_info(parser_algorythm_name: str) -> Dict[str, Any]:
     """
     Get algorithm metadata for a specific parser.
 
     Args:
-        parser_name: Name of the parser
+        parser_algorythm_name: Name of the parser
 
     Returns:
         Dictionary containing algorithm metadata
     """
-    return ALGORITHM_METADATA.get(parser_name, {
-        'name': parser_name.replace('_', ' ').title(),
+    return ALGORITHM_METADATA.get(parser_algorythm_name, {
+        'name': parser_algorythm_name.replace('_', ' ').title(),
         'time_complexity': 'Unknown',
         'space_complexity': 'Unknown',
         'overall_complexity': 'Unknown',
@@ -283,13 +283,13 @@ def generate_algorithm_report() -> str:
         key=lambda x: get_complexity_score(x[1]['time_complexity'])
     )
 
-    for parser_name, info in sorted_algos:
-        report.append("Algorithm: " + info['name'])
-        report.append("  Time Complexity: " + info['time_complexity'])
-        report.append("  Space Complexity: " + info['space_complexity'])
-        report.append("  Overall: " + info['overall_complexity'])
-        report.append("  Description: " + info['description'])
-        report.append("  Best Use Case: " + info['best_use_case'])
+    for parser_algo_name, algo_info in sorted_algos:
+        report.append("Algorithm: " + algo_info['name'])
+        report.append("  Time Complexity: " + algo_info['time_complexity'])
+        report.append("  Space Complexity: " + algo_info['space_complexity'])
+        report.append("  Overall: " + algo_info['overall_complexity'])
+        report.append("  Description: " + algo_info['description'])
+        report.append("  Best Use Case: " + algo_info['best_use_case'])
         report.append("")
 
     return "\n".join(report)

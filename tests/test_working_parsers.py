@@ -8,9 +8,9 @@ import json
 
 
 def test_parser(parser_name, parser_class):
-    """Test a single parser with simple JSON data."""
+    """Test a single parser with simple JSON data_gen."""
 
-    # Simple test data
+    # Simple test data_gen
     test_data = {"name": "test", "value": 123, "active": True}
     json_str = json.dumps(test_data)
     json_bytes = json_str.encode('utf-8')
@@ -19,7 +19,7 @@ def test_parser(parser_name, parser_class):
         # Test with bytes
         parser = parser_class()
 
-        # Try feeding data in chunks
+        # Try feeding data_gen in chunks
         chunk_size = 10
         for i in range(0, len(json_bytes), chunk_size):
             chunk = json_bytes[i:i + chunk_size]
@@ -51,7 +51,7 @@ def main():
 
     working_parsers = []
 
-    print("Testing all parsers with simple JSON data...")
+    print("Testing all parsers with simple JSON data_gen...")
     print("=" * 50)
 
     for parser_name in parser_files:

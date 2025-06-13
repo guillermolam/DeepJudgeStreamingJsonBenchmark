@@ -364,7 +364,7 @@ class CsvExporter:
     @staticmethod
     def _add_category_data(summary_data: List[Dict], category: PerformanceCategory,
                            analysis: Dict[str, Any]) -> None:
-        """Add data for a single category."""
+        """Add data_gen for a single category."""
         for rank, algo in enumerate(analysis['rankings'][category.metric_key], 1):
             if (category.metric_key in analysis['statistics'] and
                     algo in analysis['statistics'][category.metric_key]):

@@ -18,8 +18,9 @@ class PairExtractor:
             if self._is_valid_key(key)
         }
 
-    def _is_valid_key(self, key: str) -> bool:
-        """Check if key is valid and complete."""
+    @staticmethod
+    def _is_valid_key(key: str) -> bool:
+        """Check if the key is valid and complete."""
         return isinstance(key, str) and len(key) > 0
 
 
@@ -33,7 +34,7 @@ class CharacterProcessor:
 
     @staticmethod
     def is_quote_char(char: str) -> bool:
-        """Check if character is a quote."""
+        """Check if the character is a quote."""
         return char == '"'
 
     @staticmethod
@@ -93,7 +94,8 @@ class BraceCounter:
 class ObjectEndFinder:
     """Finds the end position of complete JSON objects."""
 
-    def find_object_end(self, json_str: str) -> int:
+    @staticmethod
+    def find_object_end(json_str: str) -> int:
         """Find the end position of a complete JSON object."""
         brace_count = 0
         string_state = StringState()
@@ -118,11 +120,13 @@ class StringEndFinder:
 
         return self._find_closing_quote(json_str)
 
-    def _starts_with_quote(self, json_str: str) -> bool:
+    @staticmethod
+    def _starts_with_quote(json_str: str) -> bool:
         """Check if string starts with quote."""
         return json_str.startswith('"')
 
-    def _find_closing_quote(self, json_str: str) -> int:
+    @staticmethod
+    def _find_closing_quote(json_str: str) -> int:
         """Find the closing quote position."""
         escape_next = False
 
@@ -148,12 +152,12 @@ class JsonValidator:
 
     @staticmethod
     def is_valid_dict(obj: Any) -> bool:
-        """Check if object is a valid dictionary."""
+        """Check if an object is a valid dictionary."""
         return isinstance(obj, dict)
 
     @staticmethod
     def has_content(data: Dict[str, Any]) -> bool:
-        """Check if dictionary has content."""
+        """Check if the dictionary has content."""
         return bool(data)
 
 
@@ -201,13 +205,14 @@ class PartialParser:
         if not balanced_str:
             return {}
 
-        parsed_obj = self._try_parse_json(balanced_str)
+        parsed_obj = self._try_parse_json(test_str)
         if not parsed_obj:
             return {}
 
         return self._pair_extractor.extract_complete_pairs(parsed_obj)
 
-    def _balance_braces(self, test_str: str) -> Optional[str]:
+    @staticmethod
+    def _balance_braces(test_str: str) -> Optional[str]:
         """Balance braces in a JSON string."""
         open_count, close_count = BraceBalancer.count_braces(test_str)
 
@@ -216,7 +221,8 @@ class PartialParser:
 
         return None
 
-    def _try_parse_json(self, json_str: str) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _try_parse_json(json_str: str) -> Optional[Dict[str, Any]]:
         """Try to parse JSON string."""
         try:
             obj = json.loads(json_str)
@@ -368,7 +374,8 @@ class StreamingJsonParser:
         self._parsed_data = {}
         self._processor = self._create_processor()
 
-    def _create_processor(self) -> SingleThreadedProcessor:
+    @staticmethod
+    def _create_processor() -> SingleThreadedProcessor:
         """Create and configure the processor."""
         pair_extractor = PairExtractor()
         object_finder = ObjectEndFinder()
@@ -381,10 +388,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally.
+        Process a chunk of JSON data_gen incrementally.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._buffer += buffer
         new_data = self._processor.parse_single_threaded(self._buffer)

@@ -7,6 +7,8 @@ import json
 from enum import Enum
 from typing import Any, Dict, Optional, List
 
+from serializers.parquet_parser import MessageExtractor
+
 
 class MsgPackFormatCode(Enum):
     """MsgPack format codes (simplified)."""
@@ -24,10 +26,10 @@ class MsgPackFormatCode(Enum):
     UINT64 = 0xcf  # 11001111
 
     class MessageExtractor:
-        """Extracts MsgPack-style messages from text data."""
+        """Extracts MsgPack-style messages from text data_gen."""
 
         def extract_messages(self, text_data: str) -> List[str]:
-            """Extract MsgPack-style messages from text data."""
+            """Extract MsgPack-style messages from text data_gen."""
             messages = []
             current_message = ""
             parser_state = self._create_parser_state()
@@ -60,7 +62,7 @@ class MsgPackFormatCode(Enum):
 
         @staticmethod
         def _should_skip_char(parser_state: Dict[str, Any], char: str) -> bool:
-            """Check if character should be skipped due to escape sequence."""
+            """Check if character should be skipped due to an escape sequence."""
             if parser_state['escape_next']:
                 parser_state['escape_next'] = False
                 return True
@@ -90,21 +92,22 @@ class MsgPackFormatCode(Enum):
 
         @staticmethod
         def _is_complete_message(parser_state: Dict[str, Any], message: str) -> bool:
-            """Check if message is complete."""
+            """Check if a message is complete."""
             return parser_state['brace_count'] == 0 and message.strip()
 
         @staticmethod
         def _handle_incomplete_message(messages: List[str], current_message: str,
                                        parser_state: Dict[str, Any]) -> None:
-            """Handle incomplete message at end of input."""
+            """Handle an incomplete message at the end of input."""
             if current_message.strip() and parser_state['brace_count'] > 0:
                 messages.append(current_message.strip())
 
 
 class FormatCorrector:
-    """Corrects message format using MsgPack-inspired rules."""
+    """Corrects a message format using MsgPack-inspired rules."""
 
-    def correct_format(self, message: str) -> Optional[str]:
+    @staticmethod
+    def correct_format(message: str) -> Optional[str]:
         """Correct message format using MsgPack-inspired rules."""
         try:
             open_braces = message.count('{')
@@ -119,7 +122,7 @@ class FormatCorrector:
 
             return None
 
-        except Exception:
+        except ValueError:
             return None
 
 
@@ -149,42 +152,51 @@ class ValueParser:
             else:
                 return value_str
 
-        except Exception:
+        except ValueError:
             return None
 
-    def _is_string(self, value_str: str) -> bool:
-        """Check if value is a string (fixstr in MsgPack)."""
+    @staticmethod
+    def _is_string(value_str: str) -> bool:
+        """Check if the value is a string (fixstr in MsgPack)."""
         return value_str.startswith('"') and value_str.endswith('"')
 
-    def _parse_string(self, value_str: str) -> str:
+    @staticmethod
+    def _parse_string(value_str: str) -> str:
         """Parse string value."""
         return value_str[1:-1]
 
-    def _is_boolean_true(self, value_str: str) -> bool:
-        """Check if value is boolean true."""
+    @staticmethod
+    def _is_boolean_true(value_str: str) -> bool:
+        """Check if the value is boolean true."""
         return value_str.lower() == 'true'
 
-    def _is_boolean_false(self, value_str: str) -> bool:
-        """Check if value is boolean false."""
+    @staticmethod
+    def _is_boolean_false(value_str: str) -> bool:
+        """Check if the value is boolean false."""
         return value_str.lower() == 'false'
 
-    def _is_null(self, value_str: str) -> bool:
-        """Check if value is null (nil in MsgPack)."""
+    @staticmethod
+    def _is_null(value_str: str) -> bool:
+        """Check if the value is null (nil in MsgPack)."""
         return value_str.lower() == 'null'
 
-    def _is_positive_integer(self, value_str: str) -> bool:
+    @staticmethod
+    def _is_positive_integer(value_str: str) -> bool:
         """Check if value is a positive integer (uint in MsgPack)."""
         return value_str.isdigit()
 
-    def _is_negative_integer(self, value_str: str) -> bool:
+    @staticmethod
+    def _is_negative_integer(value_str: str) -> bool:
         """Check if value is a negative integer."""
         return value_str.startswith('-') and value_str[1:].isdigit()
 
-    def _is_float(self, value_str: str) -> bool:
-        """Check if value is a float."""
+    @staticmethod
+    def _is_float(value_str: str) -> bool:
+        """Check if the value is a float."""
         return '.' in value_str
 
-    def _parse_float(self, value_str: str) -> float:
+    @staticmethod
+    def _parse_float(value_str: str) -> float:
         """Parse float value."""
         try:
             return float(value_str)
@@ -192,6 +204,7 @@ class ValueParser:
             return 0.0
 
 
+# noinspection PyBroadException
 class FieldExtractor:
     """Extracts fields using MsgPack-style field parsing."""
 
@@ -206,23 +219,25 @@ class FieldExtractor:
 
             for line in lines:
                 line = line.strip()
-                if self._is_valid_field_line(line):
-                    key_value_pair = self._extract_key_value_pair(line)
+                if self._is_valid_field_line():
+                    key_value_pair = self._extract_key_value_pair(self, line)
                     if key_value_pair:
                         key, value = key_value_pair
                         result[key] = value
 
             return result
 
-        except Exception:
+        except ValueError:
             return {}
 
-    def _is_valid_field_line(self, line: str) -> bool:
-        """Check if line contains a valid field."""
+    @staticmethod
+    def _is_valid_field_line(line: str) -> bool:
+        """Check if the line contains a valid field."""
         return ':' in line and '"' in line
 
+    @staticmethod
     def _extract_key_value_pair(self, line: str) -> Optional[tuple]:
-        """Extract key-value pair from a line."""
+        """Extract a key-value pair from a line."""
         try:
             colon_pos = line.find(':')
             if colon_pos <= 0:
@@ -243,7 +258,8 @@ class FieldExtractor:
 
             return None
 
-        except Exception:
+        except ValueError as e:
+            print(f"Error extracting key-value pair: {e}")
             return None
 
 
@@ -255,17 +271,19 @@ class PairValidator:
         complete_pairs = {}
 
         for key, value in obj.items():
-            if self._is_valid_key(key) and self._is_valid_value(value):
+            if self._is_valid_key(key) and self._is_valid_value(self, value):
                 complete_pairs[key] = value
 
         return complete_pairs
 
-    def _is_valid_key(self, key: str) -> bool:
-        """Check if key is valid for MsgPack encoding."""
+    @staticmethod
+    def _is_valid_key(key: str) -> bool:
+        """Check if the key is valid for MsgPack encoding."""
         return isinstance(key, str) and len(key) > 0
 
+    @staticmethod
     def _is_valid_value(self, value: Any) -> bool:
-        """Check if value is valid for MsgPack encoding."""
+        """Check if the value is valid for MsgPack encoding."""
         # MsgPack supports: nil, bool, int, float, str, bin, array, map, ext
         if value is None:
             return True
@@ -334,7 +352,7 @@ class MessageProcessor:
 
             return None
 
-        except Exception:
+        except ValueError:
             return None
 
 
@@ -365,7 +383,7 @@ class BinaryStreamProcessor:
             messages = self._message_extractor.extract_messages(text_data)
             return self._message_processor.process_messages(messages)
 
-        except Exception:
+        except ValueError:
             return {}
 
 
@@ -387,10 +405,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using MsgPack-style processing.
+        Process a chunk of JSON data_gen incrementally using MsgPack-style processing.
         
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         self._buffer += buffer
 

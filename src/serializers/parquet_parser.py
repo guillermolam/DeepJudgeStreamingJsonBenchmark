@@ -37,7 +37,7 @@ class _ScanState:
 
 @dataclass(frozen=True)
 class ParsedMessage:
-    """Immutable data structure for parsed messages."""
+    """Immutable data_gen structure for parsed messages."""
     content: str
     is_complete: bool
     brace_count: int
@@ -48,7 +48,7 @@ class MessageExtractor:
 
     @staticmethod
     def extract_messages(text: str) -> List[ParsedMessage]:
-        """Extract complete JSON messages from text data."""
+        """Extract complete JSON messages from text data_gen."""
         if not text:
             return []
 
@@ -340,10 +340,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally.
+        Process a chunk of JSON data_gen incrementally.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         if not buffer:
             return
@@ -362,7 +362,7 @@ class StreamingJsonParser:
         return self._parsed_data.copy()
 
     def _update_binary_stream(self, buffer: str) -> None:
-        """Update binary stream with new buffer data."""
+        """Update binary stream with new buffer data_gen."""
         buffer_bytes = buffer.encode('utf-8')
         self._binary_stream.extend(buffer_bytes)
 

@@ -4,6 +4,7 @@ Note: Pickle is for Python objects, so this implements JSON parsing
 with Pickle-inspired multithreaded buffering and concurrent processing.
 """
 import json
+import multiprocessing
 import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -23,15 +24,17 @@ class PairExtractor:
 
         return complete_pairs
 
-    def _is_valid_key(self, key: str) -> bool:
-        """Check if key is valid and complete."""
+    @staticmethod
+    def _is_valid_key(key: str) -> bool:
+        """Check if the key is valid and complete."""
         return isinstance(key, str) and len(key) > 0
 
 
 class ChunkSplitter:
     """Splits chunks into segments for parallel processing."""
 
-    def split_chunk(self, chunk: str) -> List[str]:
+    @staticmethod
+    def split_chunk(chunk: str) -> List[str]:
         """Split chunk into segments for parallel processing."""
         segments = []
 
@@ -76,10 +79,11 @@ class PartialSegmentParser:
 
             return None
 
-        except Exception:
+        except ValueError:
             return None
 
-    def _balance_braces(self, remaining: str) -> Optional[str]:
+    @staticmethod
+    def _balance_braces(remaining: str) -> Optional[str]:
         """Balance braces in JSON string."""
         open_braces = remaining.count('{')
         close_braces = remaining.count('}')
@@ -89,7 +93,8 @@ class PartialSegmentParser:
 
         return None
 
-    def _try_parse_json(self, json_str: str) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _try_parse_json(json_str: str) -> Optional[Dict[str, Any]]:
         """Try to parse JSON string."""
         try:
             obj = json.loads(json_str)
@@ -106,7 +111,7 @@ class SegmentProcessor:
         self._partial_parser = partial_parser
 
     def process_segment(self, segment: str) -> Optional[Dict[str, Any]]:
-        """Process a segment and return parsed data."""
+        """Process a segment and return parsed data_gen."""
         try:
             result = {}
 
@@ -123,7 +128,8 @@ class SegmentProcessor:
 
             return result if result else None
 
-        except Exception:
+        except ValueError as e:
+            print(f"Error processing segment: {e}")
             return None
 
     def _process_line(self, line: str) -> Optional[Dict[str, Any]]:
@@ -145,12 +151,16 @@ class ChunkProcessor:
     def __init__(self, chunk_splitter: ChunkSplitter, segment_processor: SegmentProcessor):
         self._chunk_splitter = chunk_splitter
         self._segment_processor = segment_processor
-        self._executor = ThreadPoolExecutor(max_workers=2)
+        # Get the number of core processors of the system
+        num_cores = multiprocessing.cpu_count()
+        self._executor = ThreadPoolExecutor(max_workers=num_cores)
 
     def parse_chunk_threaded(self, chunk: str) -> Dict[str, Any]:
         """Parse a chunk using multithreaded approach."""
         # Split chunk into smaller segments for parallel processing
         segments = self._chunk_splitter.split_chunk(chunk)
+        if not segments:
+            return {}
 
         # Process segments concurrently
         futures = []
@@ -165,7 +175,8 @@ class ChunkProcessor:
                 segment_result = future.result(timeout=1.0)
                 if segment_result:
                     result.update(segment_result)
-            except Exception:
+            except ValueError as e:
+                print(f"Error processing segment: {e}")
                 continue  # Skip failed segments
 
         return result
@@ -207,19 +218,19 @@ class QueueManager:
 
 
 class ThreadSafeDataManager:
-    """Thread-safe data management."""
+    """Thread-safe data_gen management."""
 
     def __init__(self):
         self._parsed_data = {}
         self._data_lock = threading.Lock()
 
     def update_data(self, new_data: Dict[str, Any]) -> None:
-        """Thread-safe data update."""
+        """Thread-safe data_gen update."""
         with self._data_lock:
             self._parsed_data.update(new_data)
 
     def get_data_copy(self) -> Dict[str, Any]:
-        """Get thread-safe copy of data."""
+        """Get a thread-safe copy of data_gen."""
         with self._data_lock:
             return self._parsed_data.copy()
 
@@ -282,10 +293,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using multiple threads.
+        Process a chunk of JSON data_gen incrementally using multiple threads.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         with self._buffer_lock:
             self._buffer += buffer
@@ -298,7 +309,7 @@ class StreamingJsonParser:
 
     def get(self) -> Dict[str, Any]:
         """
-        Return current parsed state as Python object.
+        Return current parsed state as a Python object.
 
         Returns:
             Dictionary containing all complete key-value pairs parsed so far

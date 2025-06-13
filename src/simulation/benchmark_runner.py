@@ -26,7 +26,6 @@ from tqdm import tqdm
 from .algo_metadata import ALGORITHM_METADATA
 from .data_gen import generate_test_data, create_streaming_chunks
 from .net_sim import HTTPSimulator, TCPSimulator, TelnetSimulator
-from .utils import Timer, calculate_throughput, calculate_amdahl_speedup, save_results
 
 
 @dataclass

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional, Protocol, NamedTuple
 
 
-# Immutable data structures for better state management
+# Immutable data_gen structures for better state management
 @dataclass(frozen=True)
 class ParseResult:
     """Immutable container for parsing results."""
@@ -91,7 +91,7 @@ class StreamingJsonParser:
         }
 
     def consume(self, buffer: str) -> None:
-        """Process a chunk of JSON data incrementally."""
+        """Process a chunk of JSON data_gen incrementally."""
         self._state = self._append_to_buffer(self._state, buffer)
         self._state = self._parse_and_update_state(self._state)
 

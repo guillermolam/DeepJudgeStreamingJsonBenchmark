@@ -2,13 +2,13 @@
 Data Generator for Streaming JSON Parser Benchmarks
 ===================================================
 
-Generates deterministic JSON test data with varying complexity levels for
+Generates deterministic JSON test data_gen with varying complexity levels for
 benchmarking streaming JSON parser implementations. This module provides
-the core data generation functionality used by the benchmarking system.
+the core data_gen generation functionality used by the benchmarking system.
 
 Key Features:
-- Deterministic data generation with configurable complexity
-- Support for nested objects, arrays, and mixed data types
+- Deterministic data_gen generation with configurable complexity
+- Support for nested objects, arrays, and mixed data_gen types
 - Streaming chunk generation for network simulation
 - Data validation and metadata generation
 
@@ -24,7 +24,7 @@ from typing import Dict, List, Any, Tuple
 
 
 class DataType(Enum):
-    """Enumeration of supported data types."""
+    """Enumeration of supported data_gen types."""
     STRING = "string"
     NUMBER = "number"
     BOOLEAN = "boolean"
@@ -34,15 +34,15 @@ class DataType(Enum):
 
 
 class GeneratorConfig:
-    """Configuration constants for data generation."""
+    """Configuration constants for data_gen generation."""
 
     DEFAULT_STRING_VALUES = [
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
         "The quick brown fox jumps over the lazy dog",
-        "Streaming JSON parser performance benchmark test data",
+        "Streaming JSON parser performance benchmark test data_gen",
         "Artificial intelligence and machine learning algorithms",
         "Distributed systems and microservices architecture",
-        "Real-time data processing and analytics pipeline",
+        "Real-time data_gen processing and analytics pipeline",
         "Cloud computing infrastructure and scalability",
         "Database optimization and query performance tuning",
         "Network protocols and communication standards",
@@ -97,7 +97,7 @@ class ValueGenerator:
 
 
 class FieldCounter:
-    """Manages field counting for data generation."""
+    """Manages field counting for data_gen generation."""
 
     def __init__(self, target_fields: int):
         self._target_fields = target_fields
@@ -128,11 +128,11 @@ class FieldCounter:
 
 
 class MetadataGenerator:
-    """Generates metadata for test data."""
+    """Generates metadata for test data_gen."""
 
     @staticmethod
     def generate_metadata(fields_created: int, target_fields: int) -> Dict[str, Any]:
-        """Generate metadata for the test data."""
+        """Generate metadata for the test data_gen."""
         return {
             "generated_at": datetime.now().isoformat(),
             "total_fields": fields_created,
@@ -262,14 +262,14 @@ class SimpleFieldGenerator:
 
 
 class DataGenerator:
-    """Main data generator orchestrating the creation of test data."""
+    """Main data_gen generator orchestrating the creation of test data_gen."""
 
     def __init__(self, num_fields: int, config: GeneratorConfig):
         self._validate_input(num_fields)
         self._field_counter = FieldCounter(num_fields)
         self._config = config
         self._value_generator = ValueGenerator(config.DEFAULT_STRING_VALUES)
-        self._nested_generator = NestedObjectGenerator(self._value_generator, self._field_counter)
+        self._nested_generator = NestedObjectGenerator(2, self._field_counter)
         self._array_generator = ArrayGenerator(self._value_generator)
         self._simple_generator = SimpleFieldGenerator(self._value_generator)
         self._metadata_generator = MetadataGenerator()
@@ -283,7 +283,7 @@ class DataGenerator:
             raise ValueError(f"num_fields must be a positive integer, got {num_fields}")
 
     def generate(self) -> Dict[str, Any]:
-        """Generate test data with the specified number of fields."""
+        """Generate test data_gen with the specified number of fields."""
         random.seed(42 + self._field_counter.target_fields)
         data_generated = {}
 
@@ -345,7 +345,7 @@ class ChunkSizeCalculator:
 
     @staticmethod
     def calculate_chunk_size(data_size: int) -> int:
-        """Calculate optimal chunk size based on data size."""
+        """Calculate optimal chunk size based on data_gen size."""
         if data_size < 1000:
             return 50
         elif data_size < 10000:
@@ -357,32 +357,32 @@ class ChunkSizeCalculator:
 
 
 class StreamingChunkGenerator:
-    """Generates streaming chunks from JSON data."""
+    """Generates streaming chunks from JSON data_gen."""
 
     def __init__(self, chunk_calculator: ChunkSizeCalculator):
         self._chunk_calculator = chunk_calculator
 
-    def create_chunks(self, json_bytes: bytes, chunk_size: int = None) -> List[bytes]:
+    def create_chunks(self, json_bytes_chunk: bytes, chunk_size: int = None) -> List[bytes]:
         """Split JSON bytes into chunks for streaming simulation."""
         if chunk_size is None:
-            chunk_size = self._chunk_calculator.calculate_chunk_size(len(json_bytes))
+            chunk_size = self._chunk_calculator.calculate_chunk_size(len(json_bytes_chunk))
 
-        return [json_bytes[i:i + chunk_size]
-                for i in range(0, len(json_bytes), chunk_size)]
+        return [json_bytes_chunk[i:i + chunk_size]
+                for i in range(0, len(json_bytes_chunk), chunk_size)]
 
 
 class MixedComplexityDataGenerator:
-    """Generates data with mixed complexity patterns."""
+    """Generates data_gen with mixed complexity patterns."""
 
     def __init__(self, config: GeneratorConfig):
         self._config = config
         self._value_generator = ValueGenerator(config.DEFAULT_STRING_VALUES)
 
     def generate(self, num_fields: int) -> Dict[str, Any]:
-        """Generate JSON data with mixed complexity patterns."""
+        """Generate JSON data_gen with mixed complexity patterns."""
         random.seed(42 + num_fields)
 
-        data = {
+        json_data = {
             "simple_fields": {},
             "arrays": {},
             "nested_objects": {},
@@ -392,13 +392,13 @@ class MixedComplexityDataGenerator:
 
         fields_per_section = num_fields // 5
 
-        self._populate_simple_fields(data["simple_fields"], fields_per_section)
-        self._populate_arrays(data["arrays"], fields_per_section)
-        self._populate_nested_objects(data["nested_objects"], fields_per_section)
-        self._populate_mixed_arrays(data["mixed_arrays"], fields_per_section)
-        self._populate_deep_nesting(data["deep_nesting"], num_fields - (fields_per_section * 4))
+        self._populate_simple_fields(json_data["simple_fields"], fields_per_section)
+        self._populate_arrays(json_data["arrays"], fields_per_section)
+        self._populate_nested_objects(json_data["nested_objects"], fields_per_section)
+        self._populate_mixed_arrays(json_data["mixed_arrays"], fields_per_section)
+        self._populate_deep_nesting(json_data["deep_nesting"], num_fields - (fields_per_section * 4))
 
-        return data
+        return json_data
 
     @staticmethod
     def _populate_simple_fields(section: Dict[str, Any], count: int) -> None:
@@ -411,13 +411,15 @@ class MixedComplexityDataGenerator:
                 None
             ])
 
-    def _populate_arrays(self, section: Dict[str, Any], count: int) -> None:
+    @staticmethod
+    def _populate_arrays(section: Dict[str, Any], count: int) -> None:
         """Populate an arrays section."""
         for i in range(count):
             array_size = random.randint(5, 20)
             section[f"array_{i}"] = [random.randint(1, 1000) for _ in range(array_size)]
 
-    def _populate_nested_objects(self, section: Dict[str, Any], count: int) -> None:
+    @staticmethod
+    def _populate_nested_objects(section: Dict[str, Any], count: int) -> None:
         """Populate a nested objects section."""
         for i in range(count):
             section[f"nested_{i}"] = {
@@ -429,7 +431,8 @@ class MixedComplexityDataGenerator:
                 }
             }
 
-    def _populate_mixed_arrays(self, section: Dict[str, Any], count: int) -> None:
+    @staticmethod
+    def _populate_mixed_arrays(section: Dict[str, Any], count: int) -> None:
         """Populate a mixed arrays section."""
         for i in range(count):
             section[f"mixed_{i}"] = [
@@ -437,31 +440,32 @@ class MixedComplexityDataGenerator:
                 for j in range(random.randint(3, 10))
             ]
 
-    def _populate_deep_nesting(self, section: Dict[str, Any], count: int) -> None:
+    @staticmethod
+    def _populate_deep_nesting(section: Dict[str, Any], count: int) -> None:
         """Populate a deep nesting section."""
         current_level = section
         for i in range(count):
             current_level[f"level_{i}"] = {
-                "data": f"Level {i} data",
+                "data_gen": f"Level {i} data_gen",
                 "next": {}
             }
             current_level = current_level[f"level_{i}"]["next"]
 
 
 class DataValidator:
-    """Validates generated data against requirements."""
+    """Validates generated data_gen against requirements."""
 
     def __init__(self, config: GeneratorConfig):
         self._config = config
 
-    def validate(self, data: Dict[str, Any], expected_fields: int) -> bool:
-        """Validate that generated data meets requirements."""
-        actual_fields = self._count_fields(data)
+    def validate(self, data_gen: Dict[str, Any], expected_fields: int) -> bool:
+        """Validate that generated data_gen meets requirements."""
+        actual_fields = self._count_fields(data_gen)
         tolerance = max(1, int(expected_fields * self._config.TOLERANCE_PERCENTAGE))
         return abs(actual_fields - expected_fields) <= tolerance
 
     def _count_fields(self, obj: Any) -> int:
-        """Recursively count fields in a data structure."""
+        """Recursively count fields in a data_gen structure."""
         if isinstance(obj, dict):
             count = len(obj)
             for value in obj.values():
@@ -493,12 +497,12 @@ def generate_test_data(num_fields: int) -> Dict[str, Any]:
     return generator.generate()
 
 
-def create_streaming_chunks(json_bytes: bytes, chunk_size: int = None) -> List[bytes]:
+def create_streaming_chunks(json_bytes_chunk: bytes, chunk_size: int = None) -> List[bytes]:
     """
     Split JSON bytes into chunks for streaming simulation.
 
     Args:
-        json_bytes: The JSON data as bytes
+        json_bytes_chunk: The JSON data_gen as bytes
         chunk_size: Size of each chunk (auto-calculated if None)
 
     Returns:
@@ -506,12 +510,12 @@ def create_streaming_chunks(json_bytes: bytes, chunk_size: int = None) -> List[b
     """
     chunk_calculator = ChunkSizeCalculator()
     chunk_generator = StreamingChunkGenerator(chunk_calculator)
-    return chunk_generator.create_chunks(json_bytes, chunk_size)
+    return chunk_generator.create_chunks(json_bytes_chunk, chunk_size)
 
 
 def generate_mixed_complexity_data(num_fields: int) -> Dict[str, Any]:
     """
-    Generate JSON data with mixed complexity patterns.
+    Generate JSON data_gen with mixed complexity patterns.
 
     Args:
         num_fields: Target number of fields
@@ -524,12 +528,12 @@ def generate_mixed_complexity_data(num_fields: int) -> Dict[str, Any]:
     return generator.generate(num_fields)
 
 
-def validate_generated_data(data: Dict[str, Any], expected_fields: int) -> bool:
+def validate_generated_data(val_data_gen: Dict[str, Any], expected_fields: int) -> bool:
     """
-    Validate that generated data meets requirements.
+    Validate that generated data_gen meets requirements.
 
     Args:
-        data: Generated data dictionary
+        val_data_gen: Generated data_gen dictionary
         expected_fields: Expected number of fields
 
     Returns:
@@ -537,19 +541,19 @@ def validate_generated_data(data: Dict[str, Any], expected_fields: int) -> bool:
     """
     config = GeneratorConfig()
     validator = DataValidator(config)
-    return validator.validate(data, expected_fields)
+    return validator.validate(val_data_gen, expected_fields)
 
 
 if __name__ == "__main__":
     """
-    Demo script showing data generator capabilities.
+    Demo script showing data_gen generator capabilities.
     
-    This is a demonstration of the data generator functionality.
+    This is a demonstration of the data_gen generator functionality.
     For comprehensive testing, run the test suite: pytest tests/simulation/test_data_gen.py
     """
     print("Data Generator Demo")
     print("=" * 50)
-    print("This demonstrates the data generation capabilities.")
+    print("This demonstrates the data_gen generation capabilities.")
     print("For comprehensive testing, run: pytest tests/simulation/test_data_gen.py")
     print()
 

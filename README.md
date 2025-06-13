@@ -142,7 +142,7 @@ python main.py --output-dir .\results --verbose
 
 2. **Configure Python Interpreter:**
     - File → Settings → Project → Python Interpreter
-    - Add new interpreter or use existing Python 3.8+
+   - Add a new interpreter or use existing Python 3.8+
 
 3. **Install Dependencies:**
     - Open Terminal in PyCharm
@@ -289,22 +289,22 @@ pre-commit run --all-files
 - **ujson** (≥5.0.0) - Ultra-fast JSON encoder/decoder
 - **pymongo** (≥4.0.0) - BSON support
 - **cbor2** (≥5.4.0) - CBOR encoding/decoding
-- **msgpack** (≥1.0.0) - MessagePack serialization
+- **msgpack** (≥1.0.0)—MessagePack serialization
 - **protobuf** (≥4.0.0) - Protocol Buffers
-- **flatbuffers** (≥2.0.0) - FlatBuffers serialization
+- **flatbuffers** (≥2.0.0)—FlatBuffers serialization
 - **pyarrow** (≥10.0.0) - Parquet format support
-- **reactivex** (≥4.0.0) - Reactive programming
+- **reactivex** (≥4.0.0)—Reactive programming
 - **psutil** (≥5.8.0) - System monitoring
 - **matplotlib** (≥3.5.0) - Plotting and visualization
 - **seaborn** (≥0.11.0) - Statistical visualization
 - **tqdm** (≥4.60.0) - Progress bars
 - **colorama** (≥0.4.4) - Colored terminal output
-- **tabulate** (≥0.9.0) - Table formatting
+- **tabulate** (≥0.9.0)—Table formatting
 
 ### Development Dependencies (Optional)
 
 - **pytest** (≥7.0.0) - Testing framework
-- **black** (≥22.0.0) - Code formatter
+- **black** (≥22.0.0)—Code formatter
 - **flake8** (≥5.0.0) - Linting
 - **mypy** (≥1.0.0) - Type checking
 
@@ -321,7 +321,7 @@ pre-commit run --all-files
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License—see the LICENSE file for details.
 
 ## 🆘 Troubleshooting
 
@@ -350,7 +350,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 4. **Memory Issues:**
    ```bash
-   # Reduce test data size in data_gen.py
+   # Reduce test data_gen size in data_gen.py
    # Or run with smaller datasets
    python main.py --output-dir ./results
    ```
@@ -360,7 +360,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Check the logs in `benchmark.log` for detailed error information
 - Run with `--verbose` flag for more detailed output
 - Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Verify Python version: `python --version` (requires Python 3.8+)
+- Verify a compatible Python version: `python --version` (requires Python 3.8+)
 
 ## 🎯 Performance Tips
 

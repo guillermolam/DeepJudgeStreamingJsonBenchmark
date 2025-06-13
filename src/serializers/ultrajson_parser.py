@@ -23,10 +23,10 @@ class StreamingJsonParser:
 
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data incrementally using Ultra-JSON style optimization.
+        Process a chunk of JSON data_gen incrementally using Ultra-JSON style optimization.
 
         Args:
-            buffer: String chunk of JSON data to process
+            buffer: String chunk of JSON data_gen to process
         """
         if not buffer:
             return
@@ -66,7 +66,7 @@ class StreamingJsonParser:
                 break
 
     def _has_more_data(self) -> bool:
-        """Check if there's more data to parse."""
+        """Check if there's more data_gen to parse."""
         return self.parse_position < len(self.fast_buffer)
 
     def _find_next_object_boundaries(self) -> Optional[Tuple[int, int]]:
@@ -170,7 +170,7 @@ class StreamingJsonParser:
             return None
 
     def _update_parsed_data(self, obj: Dict[str, Any]) -> None:
-        """Update parsed data with complete key-value pairs."""
+        """Update parsed data_gen with complete key-value pairs."""
         complete_pairs = self._fast_extract_complete_pairs(obj)
         self.parsed_data.update(complete_pairs)
 
