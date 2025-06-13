@@ -5,3 +5,46 @@
 *.pyo
 *.pyclass
 __pycache__
+
+# Ignore All common Python packages and modules.
+# See https://www.python.org/dev/peps/pep-0318/
+# for more information about the format.
+
+# Standard library
+build
+dist
+htmlcov
+venv
+.venv
+
+# Third party packages
+*.egg-info
+*.egg
+
+# Django
+migrations
+
+# Idea
+.idea
+# VSCode
+.vscode
+
+# PyCharm
+*.iml
+
+# Jupyter
+.ipynb_checkpoints
+# sonarlint
+.sonarlint
+# qodana
+.qodana
+.qodo
+.qodo/*
+.benchmarks
+qodo/*
+.benchmarks/*
+.benchmarks/**/*.py
+.qodo/*.py
+.qodo/**/*.py
+.qodo/*.ipynb
+.qodo/**/*.ipynb
