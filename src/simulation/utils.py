@@ -5,445 +5,350 @@ Utility Functions for Streaming JSON Parser Benchmarks
 Contains helper functions for timing, calculations, and result management.
 """
 
+from __future__ import annotations
+
 import csv
 import json
 import math
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Tuple, Sequence
 
-from click._termui_impl import ProgressBar
+# Only used for the typing stub – keeps the public surface identical
+from click._termui_impl import ProgressBar  # noqa: F401
+from tqdm import tqdm
+from tqdm.std import _T
 
 
 class Timer:
     """High-precision timer for benchmarking."""
 
-    def __init__(self):
-        self.start_time = None
-        self.end_time = None
-        self.elapsed_ns = 0
-        self.elapsed_ms = 0.0
-        self.elapsed_seconds = 0.0
+    __slots__ = ("_start_ns", "_end_ns")
 
-    def start(self):
-        """Start the timer."""
-        self.start_time = time.perf_counter_ns()
+    def __init__(self) -> None:
+        self._start_ns: int | None = None
+        self._end_ns: int | None = None
+
+    # Immutable, read-only public properties
+    @property
+    def elapsed_ns(self) -> int:         # type: ignore[override]
+        return (self._end_ns or time.perf_counter_ns()) - (self._start_ns or 0)
+
+    @property
+    def elapsed_ms(self) -> float:
+        return self.elapsed_ns / 1_000_000
+
+    @property
+    def elapsed_seconds(self) -> float:
+        return self.elapsed_ns / 1_000_000_000
+
+    # ----------------------------------------------------------
+    # Context-manager helpers
+    # ----------------------------------------------------------
+    def start(self) -> "Timer":
+        self._start_ns = time.perf_counter_ns()
         return self
 
-    def stop(self):
-        """Stop the timer and calculate elapsed time."""
-        if self.start_time is None:
+    def stop(self) -> "Timer":
+        if self._start_ns is None:
             raise RuntimeError("Timer not started")
-
-        self.end_time = time.perf_counter_ns()
-        self.elapsed_ns = self.end_time - self.start_time
-        self.elapsed_ms = self.elapsed_ns / 1_000_000
-        self.elapsed_seconds = self.elapsed_ns / 1_000_000_000
+        self._end_ns = time.perf_counter_ns()
         return self
 
-    def __enter__(self):
-        """Context manager entry."""
-        return self.start()
+    # CM protocol
+    __enter__ = start
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # noqa: D401
         self.stop()
 
-    def reset(self):
-        """Reset the timer."""
-        self.start_time = None
-        self.end_time = None
-        self.elapsed_ns = 0
-        self.elapsed_ms = 0.0
-        self.elapsed_seconds = 0.0
 
-
+# ──────────────────────────────────────────────────────────────
+# Maths & statistics helpers
+# ──────────────────────────────────────────────────────────────
 def calculate_throughput(data_size_bytes: int, time_ms: float) -> float:
-    """
-    Calculate throughput in MB/s.
-
-    Args:
-        data_size_bytes: Size of data in bytes
-        time_ms: Time taken in milliseconds
-
-    Returns:
-        Throughput in MB/s
-    """
+    """Return MB/s given bytes and milliseconds."""
     if time_ms <= 0:
         return 0.0
-
-    # Convert to MB/s
     data_size_mb = data_size_bytes / (1024 * 1024)
-    time_seconds = time_ms / 1000
-
-    return data_size_mb / time_seconds
+    return data_size_mb / (time_ms / 1000)
 
 
-def calculate_amdahl_speedup(sequential_time_ms: float, parallel_time_ms: float,
-                             num_processors: int) -> Dict[str, float]:
-    """
-    Calculate speedup and efficiency using Amdahl's Law.
-
-    Args:
-        sequential_time_ms: Time for sequential execution
-        parallel_time_ms: Time for parallel execution
-        num_processors: Number of processors used
-
-    Returns:
-        Dictionary with speedup metrics
-    """
-
-    if sequential_time_ms <= 0 or parallel_time_ms <= 0:
+def calculate_amdahl_speedup(
+    sequential_time_ms: float, parallel_time_ms: float, num_processors: int
+) -> Dict[str, float]:
+    """Return speedup / efficiency numbers using Amdahl's law."""
+    if (not math.isfinite(sequential_time_ms) or sequential_time_ms <= 0 or 
+        not math.isfinite(parallel_time_ms) or parallel_time_ms <= 0 or num_processors <= 0):
         return {
-            'speedup': 0.0,
-            'efficiency': 0.0,
-            'theoretical_speedup': 0.0,
-            'parallel_fraction': 0.0
+            "speedup": 0.0,
+            "efficiency": 0.0,
+            "theoretical_speedup": 0.0,
+            "parallel_fraction": 0.0,
         }
 
-    # Actual speedup
-    actual_speedup = sequential_time_ms / parallel_time_ms
+    speedup = sequential_time_ms / parallel_time_ms
+    efficiency = speedup / num_processors
 
-    # Efficiency (speedup per processor)
-    efficiency = actual_speedup / num_processors
-
-    # Estimate a parallel fraction (assuming some overhead)
-    # This is a simplified estimation
-    if actual_speedup >= num_processors:
-        parallel_fraction = 1.0
-    else:
-        # Solve Amdahl's equation: S = 1 / (1 - p + p/n)
-        # Where S = speedup, p = parallel fraction, n = processors
-        # Rearranging: p = (S * n - n) / (S * n - 1)
-        if actual_speedup * num_processors - 1 > 0:
-            parallel_fraction = (actual_speedup * num_processors - num_processors) / (
-                        actual_speedup * num_processors - 1)
-        else:
-            parallel_fraction = 0.0
-
-    # Theoretical maximum speedup with this parallel fraction
-    theoretical_speedup = 1 / (1 - parallel_fraction + parallel_fraction / num_processors)
+    # Parallel fraction derived from rearranged Amdahl's equation
+    denominator = (speedup * num_processors) - 1
+    parallel_fraction = (
+        1.0
+        if speedup >= num_processors
+        else max(0.0, ((speedup * num_processors) - num_processors) / denominator)
+        if denominator > 0
+        else 0.0
+    )
+    denominator_theoretical = 1 - parallel_fraction + (parallel_fraction / num_processors)
+    theoretical_speedup = (
+        float('inf') if abs(denominator_theoretical) < 1e-10
+        else 1 / denominator_theoretical
+    )
 
     return {
-        'speedup': actual_speedup,
-        'efficiency': efficiency,
-        'theoretical_speedup': theoretical_speedup,
-        'parallel_fraction': max(0.0, min(1.0, parallel_fraction))
+        "speedup": speedup,
+        "efficiency": efficiency,
+        "theoretical_speedup": theoretical_speedup,
+        "parallel_fraction": parallel_fraction,
     }
 
 
-def calculate_statistics(values: List[float]) -> Dict[str, float]:
-    """
-    Calculate basic statistics for a list of values.
-
-    Args:
-        values: List of numeric values
-
-    Returns:
-        Dictionary with statistical measures
-    """
-
+def calculate_statistics(values: Sequence[float]) -> Dict[str, float]:
+    """Return basic statistics for *values*."""
     if not values:
         return {
-            'count': 0,
-            'mean': 0.0,
-            'median': 0.0,
-            'min': 0.0,
-            'max': 0.0,
-            'std_dev': 0.0,
-            'variance': 0.0
+            "count": 0,
+            "mean": 0.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std_dev": 0.0,
+            "variance": 0.0,
         }
 
-    sorted_values = sorted(values)
     n = len(values)
-
-    # Basic measures
-    mean = sum(values) / n
-    median = sorted_values[n // 2] if n % 2 == 1 else (sorted_values[n // 2 - 1] + sorted_values[n // 2]) / 2
-    min_val = min(values)
-    max_val = max(values)
-
-    # Variance and standard deviation
-    variance = sum((x - mean) ** 2 for x in values) / n
+    mean_val = sum(values) / n
+    variance = sum((x - mean_val) ** 2 for x in values) / n
     std_dev = math.sqrt(variance)
 
+    sorted_vals = sorted(values)
+    median_val = (
+        sorted_vals[n // 2]
+        if n % 2
+        else (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+    )
+
     return {
-        'count': n,
-        'mean': mean,
-        'median': median,
-        'min': min_val,
-        'max': max_val,
-        'std_dev': std_dev,
-        'variance': variance
+        "count": n,
+        "mean": mean_val,
+        "median": median_val,
+        "min": min(values),
+        "max": max(values),
+        "std_dev": std_dev,
+        "variance": variance,
     }
 
 
-def format_bytes(bytes_value: int) -> str:
-    """
-    Format bytes in human-readable format.
-
-    Args:
-        bytes_value: Number of bytes
-
-    Returns:
-        Formatted string (e.g., "1.5 MB")
-    """
-
-    if bytes_value == 0:
+# ──────────────────────────────────────────────────────────────
+# Formatting helpers
+# ──────────────────────────────────────────────────────────────
+def format_bytes(num_bytes: int) -> str:
+    """Return *num_bytes* as human-readable string."""
+    if num_bytes == 0:
         return "0 B"
-
-    units = ['B', 'KB', 'MB', 'GB', 'TB']
-    unit_index = 0
-
-    value = float(bytes_value)
-    while value >= 1024 and unit_index < len(units) - 1:
-        value /= 1024
-        unit_index += 1
-
-    if unit_index == 0:
-        return f"{int(value)} {units[unit_index]}"
-    else:
-        return f"{value:.2f} {units[unit_index]}"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value, unit = float(num_bytes), 0
+    while value >= 1024 and unit < len(units) - 1:
+        value, unit = value / 1024, unit + 1
+    return f"{value:.2f} {units[unit]}" if unit else f"{int(value)} {units[unit]}"
 
 
 def format_time(time_ms: float) -> str:
-    """
-    Format time in human-readable format.
-
-    Args:
-        time_ms: Time in milliseconds
-
-    Returns:
-        Formatted string (e.g., "1.5 s", "250 ms")
-    """
-
+    """Return *time_ms* as human-readable string."""
     if time_ms < 1:
         return f"{time_ms * 1000:.1f} μs"
-    elif time_ms < 1000:
+    if time_ms < 1000:
         return f"{time_ms:.2f} ms"
-    else:
-        return f"{time_ms / 1000:.2f} s"
+    return f"{time_ms / 1000:.2f} s"
 
 
-def save_results(results: List[Dict[str, Any]], output_path: Union[str, Path],
-                 format_type: str = 'csv'):
-    """
-    Save benchmark results to file.
-
-    Args:
-        results: List of result dictionaries
-        output_path: Path to output file
-        format_type: Format type ('csv' or 'json')
-    """
-
+# ──────────────────────────────────────────────────────────────
+# File persistence
+# ──────────────────────────────────────────────────────────────
+def save_results(
+    results: List[Dict[str, Any]], output_path: Union[str, Path], fmt: str = "csv"
+) -> None:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if format_type.lower() == 'csv':
-        save_results_csv(results, output_path)
-    elif format_type.lower() == 'json':
-        save_results_json(results, output_path)
+    if fmt.lower() == "csv":
+        _save_results_csv(results, output_path)
+    elif fmt.lower() == "json":
+        _save_results_json(results, output_path)
     else:
-        raise ValueError(f"Unsupported format type: {format_type}")
+        raise ValueError(f"Unsupported format: {fmt}")
 
 
-def save_results_csv(results: List[Dict[str, Any]], output_path: Path):
-    """Save results to CSV file."""
-
+def _save_results_csv(results: List[Dict[str, Any]], fp: Path) -> None:
     if not results:
         return
-
-    # Get all possible field names
-    all_fields = set()
-    for result in results:
-        all_fields.update(result.keys())
-
-    # Sort fields for consistent output
-    fieldnames = sorted(all_fields)
-
-    with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+    fieldnames = sorted({k for r in results for k in r})
+    with fp.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
-
-        for result in results:
-            # Fill missing fields with empty strings
-            row = {field: result.get(field, '') for field in fieldnames}
-            writer.writerow(row)
+        for row in results:
+            writer.writerow({f: row.get(f, "") for f in fieldnames})
 
 
-def save_results_json(results: List[Dict[str, Any]], output_path: Path):
-    """Save results to JSON file."""
-
-    output_data = {
-        'metadata': {
-            'generated_at': time.strftime('%Y-%m-%d %H:%M:%S'),
-            'total_results': len(results),
-            'format_version': '1.0'
+def _save_results_json(results: List[Dict[str, Any]], fp: Path) -> None:
+    payload = {
+        "metadata": {
+            "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "total_results": len(results),
+            "format_version": "1.0",
         },
-        'results': results
+        "results": results,
     }
-
-    with open(output_path, 'w', encoding='utf-8') as jsonfile:
-        json.dump(output_data, jsonfile, indent=2, default=str)
+    fp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
 
 
-def create_progress_bar(total: int, description: str = "Progress") -> 'ProgressBar':
-    """
-    Create a simple progress bar.
-
-    Args:
-        total: Total number of items
-        description: Description for the progress bar
-
-    Returns:
-        ProgressBar instance
-    """
-
+# ──────────────────────────────────────────────────────────────
+# Progress-bar helpers
+# ──────────────────────────────────────────────────────────────
+def create_progress_bar(total: int, desc: str = "Progress") -> tqdm[_T] | _SimpleProgressBar:
+    """Return a tqdm progress-bar, or a fallback if tqdm is missing."""
     try:
-        from tqdm import tqdm
-        return tqdm(total=total, desc=description)
-    except ImportError:
-        # Fallback to simple progress indicator
-        return SimpleProgressBar(total, description)
+        from tqdm import tqdm  # type: ignore
+        return tqdm(total=total, desc=desc)
+    except ImportError:  # pragma: no cover
+        return _SimpleProgressBar(total, desc)
 
 
-class SimpleProgressBar:
-    """Simple progress bar fallback when tqdm is not available."""
+class _SimpleProgressBar:
+    """Very small fallback progress indicator (10 % increments)."""
 
-    def __init__(self, total: int, description: str = "Progress"):
-        self.total = total
-        self.description = description
-        self.current = 0
-        self.last_percent = -1
+    __slots__ = ("_total", "_desc", "_current", "_last_percent")
 
-    def update(self, n: int = 1):
-        """Update progress by n steps."""
-        self.current += n
-        percent = int((self.current / self.total) * 100)
+    def __init__(self, total: int, desc: str) -> None:
+        self._total = total
+        self._desc = desc
+        self._current = 0
+        self._last_percent = -1
 
-        if percent != self.last_percent and percent % 10 == 0:
-            print(f"{self.description}: {percent}% ({self.current}/{self.total})")
-            self.last_percent = percent
-
-    def close(self):
-        """Close the progress bar."""
-        if self.current >= self.total:
-            print(f"{self.description}: 100% ({self.total}/{self.total}) - Complete!")
-
-    def __enter__(self):
+    # CM protocol – allows *with* statements
+    def __enter__(self) -> "_SimpleProgressBar":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # noqa: D401
         self.close()
+
+    # Public methods
+    def update(self, n: int = 1) -> None:
+        self._current += n
+        self._maybe_print()
+
+    def close(self) -> None:
+        if self._current >= self._total:
+            print(f"{self._desc}: 100 % ({self._total}/{self._total}) – done")
+
+    # ----------------------------------------------------------
+    # Internal
+    # ----------------------------------------------------------
+    def _maybe_print(self) -> None:
+        percent = int((self._current / self._total) * 100)
+        if percent != self._last_percent and percent % 10 == 0:
+            print(f"{self._desc}: {percent} % ({self._current}/{self._total})")
+            self._last_percent = percent
+
+
+_REQUIRED_FIELDS: Tuple[str, ...] = (
+    "parser_name",
+    "dataset_size",
+    "run_number",
+    "protocol",
+    "success",
+    "serialize_time_ms",
+    "deserialize_time_ms",
+)
+
+
+def _missing_field_errors(
+    idx: int, result: Dict[str, Any], required: Tuple[str, ...]
+) -> List[str]:
+    missing = [f for f in required if f not in result]
+    return [f"Result {idx}: Missing required fields: {missing}"] if missing else []
+
+
+def _time_errors_and_warnings(
+    idx: int, result: Dict[str, Any]
+) -> Tuple[List[str], List[str]]:
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    serialize, deserialize = (
+        result.get("serialize_time_ms", 0),
+        result.get("deserialize_time_ms", 0),
+    )
+
+    # Negative times are always errors
+    if serialize < 0:
+        errors.append(f"Result {idx}: Negative serialize time: {serialize}")
+    if deserialize < 0:
+        errors.append(f"Result {idx}: Negative deserialize time: {deserialize}")
+
+    # Suspiciously high values are warnings
+    if serialize > 60_000:
+        warnings.append(f"Result {idx}: High serialize time: {serialize} ms")
+    if deserialize > 60_000:
+        warnings.append(f"Result {idx}: High deserialize time: {deserialize} ms")
+
+    return errors, warnings
+
+
+def _summary(results: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    successful = [r for r in results if r.get("success")]
+    failed = len(results) - len(successful)
+    return {
+        "total_results": len(results),
+        "successful_results": len(successful),
+        "failed_results": failed,
+        "success_rate": (len(successful) / len(results) * 100) if results else 0.0,
+        "unique_parsers": len({r.get("parser_name") for r in results}),
+        "unique_datasets": len({r.get("dataset_size") for r in results}),
+        "unique_protocols": len({r.get("protocol") for r in results}),
+    }
 
 
 def validate_benchmark_results(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Validate benchmark results for consistency and completeness.
+    Validate *results* for mandatory fields, time sanity, and provide a summary.
 
-    Args:
-        results: List of benchmark results
-
-    Returns:
-        Validation report
+    Cognitive complexity < 10 – achieved by delegating the subtasks to
+    small, pure helper functions.
     """
-
     if not results:
         return {
-            'valid': False,
-            'errors': ['No results to validate'],
-            'warnings': [],
-            'summary': {}
+            "valid": False,
+            "errors": ["No results to validate"],
+            "warnings": [],
+            "summary": {},
         }
 
-    errors = []
-    warnings = []
+    errors: List[str] = []
+    warnings: List[str] = []
 
-    # Required fields
-    required_fields = [
-        'parser_name', 'dataset_size', 'run_number', 'protocol',
-        'success', 'serialize_time_ms', 'deserialize_time_ms'
-    ]
+    for idx, res in enumerate(results):
+        # 1. Field completeness
+        errors.extend(_missing_field_errors(idx, res, _REQUIRED_FIELDS))
 
-    # Check for required fields
-    for i, result in enumerate(results):
-        missing_fields = [field for field in required_fields if field not in result]
-        if missing_fields:
-            errors.append(f"Result {i}: Missing required fields: {missing_fields}")
-
-    # Check for reasonable values
-    for i, result in enumerate(results):
-        if result.get('success', False):
-            # Check timing values
-            serialize_time = result.get('serialize_time_ms', 0)
-            deserialize_time = result.get('deserialize_time_ms', 0)
-
-            if serialize_time < 0:
-                errors.append(f"Result {i}: Negative serialize time: {serialize_time}")
-            if deserialize_time < 0:
-                errors.append(f"Result {i}: Negative deserialize time: {deserialize_time}")
-
-            # Check for suspiciously high values
-            if serialize_time > 60000:  # 1 minute
-                warnings.append(f"Result {i}: Very high serialize time: {serialize_time} ms")
-            if deserialize_time > 60000:
-                warnings.append(f"Result {i}: Very high deserialize time: {deserialize_time} ms")
-
-    # Summary statistics
-    successful_results = [r for r in results if r.get('success', False)]
-    failed_results = [r for r in results if not r.get('success', False)]
-
-    summary = {
-        'total_results': len(results),
-        'successful_results': len(successful_results),
-        'failed_results': len(failed_results),
-        'success_rate': len(successful_results) / len(results) * 100 if results else 0,
-        'unique_parsers': len(set(r.get('parser_name', '') for r in results)),
-        'unique_datasets': len(set(r.get('dataset_size', 0) for r in results)),
-        'unique_protocols': len(set(r.get('protocol', '') for r in results))
-    }
+        # 2. Timing sanity (only if run was marked successful)
+        if res.get("success"):
+            err, warn = _time_errors_and_warnings(idx, res)
+            errors.extend(err)
+            warnings.extend(warn)
 
     return {
-        'valid': len(errors) == 0,
-        'errors': errors,
-        'warnings': warnings,
-        'summary': summary
+        "valid": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "summary": _summary(results),
     }
-
-
-if __name__ == "__main__":
-    """Test the utility functions."""
-
-    print("Testing Utility Functions")
-    print("=" * 30)
-
-    # Test Timer
-    print("\nTesting Timer:")
-    with Timer() as timer:
-        time.sleep(0.1)
-    print(f"Elapsed: {timer.elapsed_ms:.2f} ms")
-
-    # Test throughput calculation
-    print("\nTesting Throughput Calculation:")
-    throughput = calculate_throughput(1024 * 1024, 1000)  # 1MB in 1 second
-    print(f"Throughput: {throughput:.2f} MB/s")
-
-    # Test Amdahl's Law calculation
-    print("\nTesting Amdahl's Law:")
-    speedup_info = calculate_amdahl_speedup(1000, 300, 4)
-    print(f"Speedup: {speedup_info['speedup']:.2f}")
-    print(f"Efficiency: {speedup_info['efficiency']:.2f}")
-
-    # Test statistics
-    print("\nTesting Statistics:")
-    values = [10, 20, 30, 40, 50]
-    stats = calculate_statistics(values)
-    print(f"Mean: {stats['mean']:.2f}")
-    print(f"Std Dev: {stats['std_dev']:.2f}")
-
-    # Test formatting
-    print("\nTesting Formatting:")
-    print(f"Bytes: {format_bytes(1536)}")
-    print(f"Time: {format_time(1500)}")
-
-    print("\nUtility functions test completed!")
