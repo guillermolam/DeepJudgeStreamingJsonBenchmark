@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 """
 Report Generator for Streaming JSON Parser Benchmarks
 

@@ -5,9 +5,8 @@ Uses reactive programming patterns for streaming JSON parsing.
 import json
 import threading
 import time
-from typing import Any, Dict, Optional, Callable, List
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any, Dict, Optional, Callable, List
 
 
 @dataclass
@@ -31,80 +30,111 @@ class PairExtractor:
         
         return complete_pairs
     
-    def _is_valid_key(self, key: str) -> bool:
-        """Check if key is valid and complete."""
+    @staticmethod
+    def _is_valid_key(key: str) -> bool:
+        """Check if the key is valid and complete."""
         return isinstance(key, str) and len(key) > 0
 
 
 class JsonChunkTransformer:
     """Transforms buffer into potential JSON chunks."""
-    
+
+    # ---------- public API -------------------------------------------------
     def transform_to_json_chunks(self, buffer: str) -> List[str]:
-        """Transform buffer into potential JSON chunks."""
-        chunks = []
-        current_obj = ""
-        brace_count = 0
-        in_string = False
-        escape_next = False
-        
-        for char in buffer:
-            current_obj += char
-            
-            if escape_next:
-                escape_next = False
+        """Split an incoming buffer into complete JSON-object chunks."""
+        chunks: List[str] = []
+        current: List[str] = []
+        state = self._init_state()
+
+        for ch in buffer:
+            current.append(ch)
+
+            if self._skip_due_to_escape(state, ch):
                 continue
-            
-            if char == '\\':
-                escape_next = True
-                continue
-            
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-            
-            if not in_string:
-                if char == '{':
-                    brace_count += 1
-                elif char == '}':
-                    brace_count -= 1
-                    
-                    if brace_count == 0 and current_obj.strip():
-                        chunks.append(current_obj.strip())
-                        current_obj = ""
-        
+
+            self._toggle_string_state(state, ch)
+
+            if not state["in_string"]:
+                brace_changed = self._update_brace_count(state, ch)
+                if brace_changed and self._is_complete(state, current):
+                    chunks.append("".join(current).strip())
+                    current.clear()
+
         return chunks
 
+    # ---------- helper functions ------------------------------------------
+    @staticmethod
+    def _init_state() -> Dict[str, Any]:
+        """Initialise parsing state."""
+        return {"brace": 0, "in_string": False, "escape_next": False}
+
+    @staticmethod
+    def _skip_due_to_escape(state: Dict[str, Any], ch: str) -> bool:
+        """Handle back-slash escape logic."""
+        if state["escape_next"]:
+            state["escape_next"] = False
+            return True
+        if ch == "\\":
+            state["escape_next"] = True
+            return True
+        return False
+
+    @staticmethod
+    def _toggle_string_state(state: Dict[str, Any], ch: str) -> None:
+        """Flip the *inside-string* flag when an unescaped quote is met."""
+        if ch == '"' and not state["escape_next"]:
+            state["in_string"] = not state["in_string"]
+
+    @staticmethod
+    def _update_brace_count(state: Dict[str, Any], ch: str) -> bool:
+        """Adjust brace counter, return *True* when it changed."""
+        if ch == "{":
+            state["brace"] += 1
+            return True
+        if ch == "}":
+            state["brace"] -= 1
+            return True
+        return False
+
+    @staticmethod
+    def _is_complete(state: Dict[str, Any], cur: List[str]) -> bool:
+        """An object is complete when the brace counter hits zero."""
+        return state["brace"] == 0 and "".join(cur).strip()
 
 class PartialChunkParser:
     """Parses partial JSON chunks."""
     
     def __init__(self, pair_extractor: PairExtractor):
         self._pair_extractor = pair_extractor
-    
+
     def parse_partial_chunk(self, chunk: str) -> Optional[Dict[str, Any]]:
         """Parse partial JSON chunk reactively."""
+        if not isinstance(chunk, str) or not chunk.strip():
+            return None
+
+        if '{' not in chunk:
+            return None
+
+        # Find the start of JSON
+        start_pos = chunk.find('{')
+        json_part = chunk[start_pos:]
+
         try:
-            if '{' not in chunk:
-                return None
-            
-            # Find the start of JSON
-            start_pos = chunk.find('{')
-            json_part = chunk[start_pos:]
-            
             # Try to balance braces
             balanced_json = self._balance_braces(json_part)
-            
-            if balanced_json:
-                obj = self._try_parse_json(balanced_json)
-                if obj:
-                    return self._pair_extractor.extract_complete_pairs(obj)
-            
-            return None
-        
-        except Exception:
+            if not balanced_json:
+                return None
+
+            obj = self._try_parse_json(balanced_json)
+            if not obj:
+                return None
+
+            return self._pair_extractor.extract_complete_pairs(obj)
+        except ValueError:
             return None
     
-    def _balance_braces(self, json_part: str) -> Optional[str]:
+    @staticmethod
+    def _balance_braces(json_part: str) -> Optional[str]:
         """Balance braces in JSON string."""
         open_braces = json_part.count('{')
         close_braces = json_part.count('}')
@@ -114,7 +144,8 @@ class PartialChunkParser:
         
         return None
     
-    def _try_parse_json(self, json_str: str) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    def _try_parse_json(json_str: str) -> Optional[Dict[str, Any]]:
         """Try to parse JSON string."""
         try:
             obj = json.loads(json_str)
@@ -125,22 +156,22 @@ class PartialChunkParser:
 
 class ParsedObjectTransformer:
     """Transforms JSON chunks into parsed objects."""
-    
+
     def __init__(self, pair_extractor: PairExtractor, partial_parser: PartialChunkParser):
         self._pair_extractor = pair_extractor
         self._partial_parser = partial_parser
-    
+
     def transform_to_parsed_objects(self, chunks: List[str]) -> List[Dict[str, Any]]:
         """Transform JSON chunks into parsed objects."""
         parsed_objects = []
-        
+
         for chunk in chunks:
             parsed_obj = self._process_chunk(chunk)
             if parsed_obj:
                 parsed_objects.append(parsed_obj)
-        
+
         return parsed_objects
-    
+
     def _process_chunk(self, chunk: str) -> Optional[Dict[str, Any]]:
         """Process a single chunk."""
         try:
@@ -149,9 +180,9 @@ class ParsedObjectTransformer:
                 complete_pairs = self._pair_extractor.extract_complete_pairs(obj)
                 return complete_pairs if complete_pairs else None
         except json.JSONDecodeError:
-            # Try partial parsing
+            # Try partial parsing with more specific exception handling
             return self._partial_parser.parse_partial_chunk(chunk)
-        
+
         return None
 
 
@@ -191,7 +222,7 @@ class StreamDataManager:
             ))
     
     def get_stream_copy(self) -> List[StreamEvent]:
-        """Get thread-safe copy of data stream."""
+        """Get a thread-safe copy of data stream."""
         with self._subject_lock:
             return self._data_stream.copy()
 
@@ -209,7 +240,7 @@ class ParsedDataManager:
             self._parsed_data.update(new_data)
     
     def get_data_copy(self) -> Dict[str, Any]:
-        """Get thread-safe copy of parsed data."""
+        """Get a thread-safe copy of parsed data."""
         with self._data_lock:
             return self._parsed_data.copy()
 

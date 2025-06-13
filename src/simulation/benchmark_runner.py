@@ -528,6 +528,39 @@ def _process_chunk_group(parser_class: type, chunks: List[bytes]) -> Any:
     return parser.get()
 
 
+def _sanitize_output_dir(output_arg: str) -> Path:
+    """Sanitize the user-provided output directory argument.
+
+    Resolves the provided path, forbidding path traversal attempts that
+    escape the current working directory. If a path outside the current
+    working directory is requested, a ``ValueError`` is raised.
+
+    Parameters
+    ----------
+    output_arg: str
+        The raw ``--output/-o`` argument value.
+
+    Returns
+    -------
+    Path
+        A safe, absolute ``Path`` inside the current working directory.
+    """
+    base_dir = Path.cwd().resolve()
+    candidate = Path(output_arg).expanduser()
+
+    # Resolve relative paths against the base directory so that
+    # "../foo" cannot escape : resolve() collapses any ".." segments.
+    resolved = (candidate if candidate.is_absolute() else base_dir / candidate).resolve()
+
+    try:
+        # ``relative_to`` raises ``ValueError`` if *resolved* is not within *base_dir*.
+        resolved.relative_to(base_dir)
+    except ValueError:
+        raise ValueError("Invalid output directory: Path traversal detected") from None
+
+    return resolved
+
+
 def create_argument_parser() -> argparse.ArgumentParser:
     """Create and configure argument parser."""
     parser = argparse.ArgumentParser(
@@ -576,7 +609,7 @@ def main():
     args = parser.parse_args()
 
     # Create output directory if it doesn't exist
-    output_dir = Path(args.output)
+    output_dir = _sanitize_output_dir(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     try:

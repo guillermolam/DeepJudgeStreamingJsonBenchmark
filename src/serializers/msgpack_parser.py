@@ -4,9 +4,8 @@ Note: MsgPack is a binary format, so this implements JSON parsing
 with MsgPack-inspired compact binary encoding and streaming concepts.
 """
 import json
-from typing import Any, Dict, Optional, List
-from abc import ABC, abstractmethod
 from enum import Enum
+from typing import Any, Dict, Optional, List
 
 
 class MsgPackFormatCode(Enum):
@@ -25,47 +24,83 @@ class MsgPackFormatCode(Enum):
     UINT64 = 0xcf      # 11001111
 
 
-class MessageExtractor:
-    """Extracts MsgPack-style messages from text data."""
-    
-    def extract_messages(self, text_data: str) -> List[str]:
-        """Extract MsgPack-style messages from text data."""
-        messages = []
-        current_message = ""
-        brace_count = 0
-        in_string = False
-        escape_next = False
-        
-        for char in text_data:
-            current_message += char
-            
-            if escape_next:
-                escape_next = False
-                continue
-            
-            if char == '\\':
-                escape_next = True
-                continue
-            
-            if char == '"' and not escape_next:
-                in_string = not in_string
-                continue
-            
-            if not in_string:
-                if char == '{':
-                    brace_count += 1
-                elif char == '}':
-                    brace_count -= 1
-                    
-                    if brace_count == 0 and current_message.strip():
+
+    class MessageExtractor:
+        """Extracts MsgPack-style messages from text data."""
+
+        def extract_messages(self, text_data: str) -> List[str]:
+            """Extract MsgPack-style messages from text data."""
+            messages = []
+            current_message = ""
+            parser_state = self._create_parser_state()
+
+            for char in text_data:
+                current_message += char
+
+                if self._should_skip_char(parser_state, char):
+                    continue
+
+                self._update_string_state(parser_state, char)
+
+                if not parser_state['in_string']:
+                    brace_count_changed = self._update_brace_count(parser_state, char)
+                    if brace_count_changed and self._is_complete_message(parser_state, current_message):
                         messages.append(current_message.strip())
                         current_message = ""
-        
-        # Handle incomplete message
-        if current_message.strip() and brace_count > 0:
-            messages.append(current_message.strip())
-        
-        return messages
+
+            self._handle_incomplete_message(messages, current_message, parser_state)
+            return messages
+
+        @staticmethod
+        def _create_parser_state() -> Dict[str, Any]:
+            """Create initial parser state."""
+            return {
+                'brace_count': 0,
+                'in_string': False,
+                'escape_next': False
+            }
+
+        @staticmethod
+        def _should_skip_char(parser_state: Dict[str, Any], char: str) -> bool:
+            """Check if character should be skipped due to escape sequence."""
+            if parser_state['escape_next']:
+                parser_state['escape_next'] = False
+                return True
+
+            if char == '\\':
+                parser_state['escape_next'] = True
+                return True
+
+            return False
+
+        @staticmethod
+        def _update_string_state(parser_state: Dict[str, Any], char: str) -> None:
+            """Update string parsing state."""
+            if char == '"' and not parser_state['escape_next']:
+                parser_state['in_string'] = not parser_state['in_string']
+
+        @staticmethod
+        def _update_brace_count(parser_state: Dict[str, Any], char: str) -> bool:
+            """Update brace count and return True if count changed."""
+            if char == '{':
+                parser_state['brace_count'] += 1
+                return True
+            elif char == '}':
+                parser_state['brace_count'] -= 1
+                return True
+            return False
+
+        @staticmethod
+        def _is_complete_message(parser_state: Dict[str, Any], message: str) -> bool:
+            """Check if message is complete."""
+            return parser_state['brace_count'] == 0 and message.strip()
+
+        @staticmethod
+        def _handle_incomplete_message(messages: List[str], current_message: str,
+                                       parser_state: Dict[str, Any]) -> None:
+            """Handle incomplete message at end of input."""
+            if current_message.strip() and parser_state['brace_count'] > 0:
+                messages.append(current_message.strip())
 
 
 class FormatCorrector:
