@@ -154,8 +154,9 @@ ignore_missing_imports = true
 minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
 pythonpath = [
-    "src/serializers/raw", # ← raw implementation
-    "src/serializers/solid"                  # ← solid implementation
+    "src/serializers/anyio",
+    "src/serializers/raw",
+    "src/serializers/solid"
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
