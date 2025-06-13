@@ -1,4 +1,3 @@
-
 """
 Marshall serialization streaming parser implementation.
 Note: Marshall is primarily for Python code objects, so this implements

@@ -2,10 +2,10 @@
 Ultra-JSON (ujson) streaming parser implementation.
 Uses ujson-inspired high-performance parsing techniques for streaming JSON.
 """
-import sys
 import json
-from typing import Any, Dict, Optional, Tuple
+import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 # Add src/ to sys.path so Python can find your packages
 sys.path.insert(0, str(Path(__file__).parent / "src"))

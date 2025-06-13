@@ -435,10 +435,10 @@ class PartialObjectReconstructor:
         """Check if token at index is a valid key."""
         token = tokens[index] if index < len(tokens) else None
         return (
-            token is not None and
-            isinstance(token, str) and
-            token.startswith('"') and
-            token.endswith('"')
+                token is not None and
+                isinstance(token, str) and
+                token.startswith('"') and
+                token.endswith('"')
         )
 
     @staticmethod
@@ -480,6 +480,6 @@ class PartialObjectReconstructor:
     def _skip_comma(tokens: List[str], index: int) -> int:
         """Skip comma if present and return the next index."""
         if (index < len(tokens) and
-            tokens[index] == ','):
+                tokens[index] == ','):
             return index + 1
         return index

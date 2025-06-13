@@ -19,17 +19,17 @@ class StreamEvent:
 
 class PairExtractor:
     """Extracts complete key-value pairs from objects."""
-    
+
     def extract_complete_pairs(self, obj: Dict[str, Any]) -> Dict[str, Any]:
         """Extract complete key-value pairs, allowing partial string values."""
         complete_pairs = {}
-        
+
         for key, value in obj.items():
             if self._is_valid_key(key):
                 complete_pairs[key] = value
-        
+
         return complete_pairs
-    
+
     @staticmethod
     def _is_valid_key(key: str) -> bool:
         """Check if the key is valid and complete."""
@@ -101,9 +101,10 @@ class JsonChunkTransformer:
         """An object is complete when the brace counter hits zero."""
         return state["brace"] == 0 and "".join(cur).strip()
 
+
 class PartialChunkParser:
     """Parses partial JSON chunks."""
-    
+
     def __init__(self, pair_extractor: PairExtractor):
         self._pair_extractor = pair_extractor
 
@@ -132,18 +133,18 @@ class PartialChunkParser:
             return self._pair_extractor.extract_complete_pairs(obj)
         except ValueError:
             return None
-    
+
     @staticmethod
     def _balance_braces(json_part: str) -> Optional[str]:
         """Balance braces in JSON string."""
         open_braces = json_part.count('{')
         close_braces = json_part.count('}')
-        
+
         if open_braces > close_braces:
             return json_part + '}' * (open_braces - close_braces)
-        
+
         return None
-    
+
     @staticmethod
     def _try_parse_json(json_str: str) -> Optional[Dict[str, Any]]:
         """Try to parse JSON string."""
@@ -188,14 +189,14 @@ class ParsedObjectTransformer:
 
 class ObserverManager:
     """Manages observers for the reactive stream."""
-    
+
     def __init__(self):
         self._observers = []
-    
+
     def subscribe(self, observer: Callable[[str, Any], None]) -> None:
         """Subscribe an observer to the reactive stream."""
         self._observers.append(observer)
-    
+
     def notify_observers(self, event_type: str, data: Any) -> None:
         """Notify all observers of an event."""
         for observer in self._observers:
@@ -207,11 +208,11 @@ class ObserverManager:
 
 class StreamDataManager:
     """Manages stream data and events."""
-    
+
     def __init__(self):
         self._data_stream = []
         self._subject_lock = threading.Lock()
-    
+
     def add_event(self, event_type: str, data: Any) -> None:
         """Add event to data stream."""
         with self._subject_lock:
@@ -220,7 +221,7 @@ class StreamDataManager:
                 data=data,
                 timestamp=time.time()
             ))
-    
+
     def get_stream_copy(self) -> List[StreamEvent]:
         """Get a thread-safe copy of data stream."""
         with self._subject_lock:
@@ -229,16 +230,16 @@ class StreamDataManager:
 
 class ParsedDataManager:
     """Thread-safe management of parsed data."""
-    
+
     def __init__(self):
         self._parsed_data = {}
         self._data_lock = threading.Lock()
-    
+
     def update_data(self, new_data: Dict[str, Any]) -> None:
         """Thread-safe data update."""
         with self._data_lock:
             self._parsed_data.update(new_data)
-    
+
     def get_data_copy(self) -> Dict[str, Any]:
         """Get a thread-safe copy of parsed data."""
         with self._data_lock:
@@ -247,7 +248,7 @@ class ParsedDataManager:
 
 class ReactiveStreamProcessor:
     """Main reactive stream processor."""
-    
+
     def __init__(self, chunk_transformer: JsonChunkTransformer,
                  object_transformer: ParsedObjectTransformer,
                  observer_manager: ObserverManager,
@@ -258,37 +259,37 @@ class ReactiveStreamProcessor:
         self._observer_manager = observer_manager
         self._stream_manager = stream_manager
         self._data_manager = data_manager
-    
+
     def emit_buffer_change(self, new_data: str) -> None:
         """Emit buffer change event to observers."""
         self._stream_manager.add_event('buffer_change', new_data)
         self._observer_manager.notify_observers('buffer_change', new_data)
-    
+
     def process_reactive_stream(self, buffer: str) -> None:
         """Process the data stream using reactive patterns."""
         # Transform stream: buffer -> JSON chunks -> parsed objects
         json_chunks = self._chunk_transformer.transform_to_json_chunks(buffer)
         parsed_objects = self._object_transformer.transform_to_parsed_objects(json_chunks)
-        
+
         # Subscribe to parsed objects
         self._subscribe_to_parsed_objects(parsed_objects)
-    
+
     def _subscribe_to_parsed_objects(self, parsed_objects: List[Dict[str, Any]]) -> None:
         """Subscribe to parsed objects and update state."""
         for obj in parsed_objects:
             self._on_next_parsed_object(obj)
-    
+
     def _on_next_parsed_object(self, obj: Dict[str, Any]) -> None:
         """Handle the next parsed object in reactive stream."""
         self._data_manager.update_data(obj)
-        
+
         # Emit parsed object event
         self._observer_manager.notify_observers('parsed_object', obj)
-    
+
     def subscribe_observer(self, observer: Callable[[str, Any], None]) -> None:
         """Subscribe an observer to the reactive stream."""
         self._observer_manager.subscribe(observer)
-    
+
     def get_parsed_data(self) -> Dict[str, Any]:
         """Get current parsed data."""
         return self._data_manager.get_data_copy()
@@ -296,11 +297,11 @@ class ReactiveStreamProcessor:
 
 class StreamingJsonParser:
     """ReactiveX-inspired streaming JSON parser with observable patterns."""
-    
+
     def __init__(self):
         """Initialize the streaming JSON parser."""
         self._buffer = ""
-        
+
         # Initialize components
         self._pair_extractor = PairExtractor()
         self._chunk_transformer = JsonChunkTransformer()
@@ -309,7 +310,7 @@ class StreamingJsonParser:
         self._observer_manager = ObserverManager()
         self._stream_manager = StreamDataManager()
         self._data_manager = ParsedDataManager()
-        
+
         # Initialize main processor
         self._processor = ReactiveStreamProcessor(
             self._chunk_transformer,
@@ -318,7 +319,7 @@ class StreamingJsonParser:
             self._stream_manager,
             self._data_manager
         )
-    
+
     def consume(self, buffer: str) -> None:
         """
         Process a chunk of JSON data incrementally using reactive patterns.
@@ -327,17 +328,17 @@ class StreamingJsonParser:
             buffer: String chunk of JSON data to process
         """
         self._buffer += buffer
-        
+
         # Emit buffer change event
         self._processor.emit_buffer_change(buffer)
-        
+
         # Process reactively
         self._processor.process_reactive_stream(self._buffer)
-    
+
     def subscribe(self, observer: Callable[[str, Any], None]) -> None:
         """Subscribe an observer to the reactive stream."""
         self._processor.subscribe_observer(observer)
-    
+
     def get(self) -> Dict[str, Any]:
         """
         Return current parsed state as a Python object.

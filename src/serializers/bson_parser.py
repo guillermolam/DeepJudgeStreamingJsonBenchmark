@@ -281,7 +281,7 @@ class StreamingJsonParser:
     def _is_valid_bson_object(self, obj: dict) -> bool:
         """Check if an object is valid for BSON."""
         return all(isinstance(k, str) and self._is_valid_bson_value(v)
-                  for k, v in obj.items())
+                   for k, v in obj.items())
 
     def get(self) -> Dict[str, Any]:
         """

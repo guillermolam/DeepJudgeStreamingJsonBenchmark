@@ -4,10 +4,10 @@ Note: Parquet is columnar storage format, so this implements JSON parsing
 with Parquet-inspired columnar processing and metadata handling.
 """
 import json
-from typing import Any, Dict, List, Optional, Union
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
 
 class MessagePackType(Enum):
@@ -25,13 +25,15 @@ class MessagePackType(Enum):
     UINT32 = 0xce
     UINT64 = 0xcf
 
+
 @dataclass
 class _ScanState:
     """Internal state holder for message extraction."""
-    current: list[str]          # incremental chars of the current JSON snippet
-    brace_count: int            # open–close brace balance
-    in_string: bool             # inside a '"' string?
-    escape_next: bool           # the previous char was a backslash?
+    current: list[str]  # incremental chars of the current JSON snippet
+    brace_count: int  # open–close brace balance
+    in_string: bool  # inside a '"' string?
+    escape_next: bool  # the previous char was a backslash?
+
 
 @dataclass(frozen=True)
 class ParsedMessage:
@@ -65,26 +67,26 @@ class MessageExtractor:
 
     @staticmethod
     def _consume_char(
-        ch: str,
-        st: _ScanState,
-        out: List[ParsedMessage]
+            ch: str,
+            st: _ScanState,
+            out: List[ParsedMessage]
     ) -> None:
         """Process a single character and update state."""
         st.current.append(ch)
 
-        if st.escape_next:                      # the previous char was '\'
+        if st.escape_next:  # the previous char was '\'
             st.escape_next = False
             return
 
-        if ch == '\\':                          # start of an escape
+        if ch == '\\':  # start of an escape
             st.escape_next = True
             return
 
-        if ch == '"' and not st.escape_next:    # toggle string mode
+        if ch == '"' and not st.escape_next:  # toggle string mode
             st.in_string = not st.in_string
             return
 
-        if st.in_string:                        # ignore everything inside strings
+        if st.in_string:  # ignore everything inside strings
             return
 
         st.brace_count = MessageExtractor._update_braces(ch, st.brace_count)
@@ -109,12 +111,14 @@ class MessageExtractor:
             return None
 
         content = ''.join(st.current).strip()
-        st.current.clear()          # reset for the next fragment
+        st.current.clear()  # reset for the next fragment
         return ParsedMessage(
             content=content,
             is_complete=is_complete or st.brace_count == 0,
             brace_count=st.brace_count
         )
+
+
 class ValueParser:
     """Pure functions for value parsing."""
 

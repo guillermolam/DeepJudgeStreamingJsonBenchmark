@@ -5,8 +5,8 @@ Comprehensive Benchmarking System for Streaming JSON Parsers
 This script benchmarks streaming JSON parser implementations across multiple
 metrics including performance, throughput, CPU usage, and network simulation.
 """
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Ensure `src/` is in sys.path so imports like `serializers.json_parser` work

@@ -19,8 +19,8 @@ For testing this module, see tests/simulation/test_data_gen.py
 import json
 import random
 from datetime import datetime
-from typing import Dict, List, Any, Tuple
 from enum import Enum
+from typing import Dict, List, Any, Tuple
 
 
 class DataType(Enum):
@@ -35,7 +35,7 @@ class DataType(Enum):
 
 class GeneratorConfig:
     """Configuration constants for data generation."""
-    
+
     DEFAULT_STRING_VALUES = [
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
         "The quick brown fox jumps over the lazy dog",
@@ -48,7 +48,7 @@ class GeneratorConfig:
         "Network protocols and communication standards",
         "Software engineering best practices and methodologies"
     ]
-    
+
     NESTED_OBJECT_PROBABILITY = 0.3
     ARRAY_PROBABILITY = 0.2
     MIN_FIELDS_FOR_NESTED = 50
@@ -60,26 +60,26 @@ class GeneratorConfig:
 
 class ValueGenerator:
     """Pure functions for generating different types of values."""
-    
+
     def __init__(self, string_values: List[str]):
         self._string_values = string_values
-    
+
     def generate_string(self) -> str:
         """Generate a random string value."""
         return random.choice(self._string_values)
-    
+
     @staticmethod
     def generate_number() -> int | float:
         """Generate a random number (int or float)."""
         if random.random() < 0.5:
             return random.randint(-1000000, 1000000)
         return round(random.uniform(-1000.0, 1000.0), 4)
-    
+
     @staticmethod
     def generate_boolean() -> bool:
         """Generate a random boolean value."""
         return random.random() < 0.5
-    
+
     def generate_array_element(self) -> Any:
         """Generate a random array element."""
         return random.choice([
@@ -87,7 +87,7 @@ class ValueGenerator:
             random.randint(1, 1000),
             self.generate_boolean()
         ])
-    
+
     def generate_simple_object(self, item_index: int) -> Dict[str, Any]:
         """Generate a simple object for array elements."""
         return {
@@ -98,30 +98,30 @@ class ValueGenerator:
 
 class FieldCounter:
     """Manages field counting for data generation."""
-    
+
     def __init__(self, target_fields: int):
         self._target_fields = target_fields
         self._fields_created = 0
-    
+
     @property
     def target_fields(self) -> int:
         """Get target number of fields."""
         return self._target_fields
-    
+
     @property
     def fields_created(self) -> int:
         """Get number of fields created so far."""
         return self._fields_created
-    
+
     @property
     def remaining_fields(self) -> int:
         """Get the number of remaining fields to create."""
         return self._target_fields - self._fields_created
-    
+
     def increment(self, count: int = 1) -> None:
         """Increment the field counter."""
         self._fields_created += count
-    
+
     def has_remaining_fields(self) -> bool:
         """Check if there are remaining fields to create."""
         return self._fields_created < self._target_fields
@@ -129,7 +129,7 @@ class FieldCounter:
 
 class MetadataGenerator:
     """Generates metadata for test data."""
-    
+
     @staticmethod
     def generate_metadata(fields_created: int, target_fields: int) -> Dict[str, Any]:
         """Generate metadata for the test data."""
@@ -144,39 +144,39 @@ class MetadataGenerator:
 
 class NestedObjectGenerator:
     """Handles generation of nested objects."""
-    
+
     def __init__(self, value_generator: ValueGenerator, field_counter: FieldCounter):
         self._value_generator = value_generator
         self._field_counter = field_counter
-    
+
     def create_nested_object(self, depth: int = 0, max_depth: int = 3) -> Dict[str, Any]:
         """Create a nested object with specified depth constraints."""
         if depth >= max_depth or not self._field_counter.has_remaining_fields():
             return {}
-        
+
         obj = {}
         nested_fields = min(
-            random.randint(2, 8), 
+            random.randint(2, 8),
             self._field_counter.remaining_fields
         )
-        
+
         for i in range(nested_fields):
             if not self._field_counter.has_remaining_fields():
                 break
-            
+
             key = f"nested_field_{depth}_{i}"
             obj[key] = self._generate_nested_field_value(depth, max_depth)
             self._field_counter.increment()
-        
+
         return obj
-    
+
     def _generate_nested_field_value(self, depth: int, max_depth: int) -> Any:
         """Generate a value for a nested field."""
         data_type = random.choice([
-            DataType.STRING, DataType.NUMBER, DataType.BOOLEAN, 
+            DataType.STRING, DataType.NUMBER, DataType.BOOLEAN,
             DataType.ARRAY, DataType.OBJECT
         ])
-        
+
         if data_type == DataType.STRING:
             return self._value_generator.generate_string()
         elif data_type == DataType.NUMBER:
@@ -189,7 +189,7 @@ class NestedObjectGenerator:
             return self.create_nested_object(depth + 1, max_depth)
         else:
             return self._value_generator.generate_string()
-    
+
     def _create_nested_array(self) -> List[Any]:
         """Create an array for nested objects."""
         array_size = random.randint(1, 10)
@@ -198,20 +198,20 @@ class NestedObjectGenerator:
 
 class ArrayGenerator:
     """Handles generation of arrays."""
-    
+
     def __init__(self, value_generator: ValueGenerator):
         self._value_generator = value_generator
-    
+
     def create_array(self, size_range: Tuple[int, int]) -> List[Any]:
         """Create an array with elements of various types."""
         array_size = random.randint(*size_range)
         array = []
-        
+
         for i in range(array_size):
             element_type = random.choice([
                 DataType.STRING, DataType.NUMBER, DataType.BOOLEAN, DataType.OBJECT
             ])
-            
+
             if element_type == DataType.STRING:
                 array.append(self._value_generator.generate_string())
             elif element_type == DataType.NUMBER:
@@ -220,9 +220,9 @@ class ArrayGenerator:
                 array.append(self._value_generator.generate_boolean())
             elif element_type == DataType.OBJECT:
                 array.append(self._value_generator.generate_simple_object(i))
-        
+
         return array
-    
+
     @staticmethod
     def _generate_array_number() -> int | float:
         """Generate a number specifically for arrays."""
@@ -233,16 +233,16 @@ class ArrayGenerator:
 
 class SimpleFieldGenerator:
     """Handles generation of simple fields."""
-    
+
     def __init__(self, value_generator: ValueGenerator):
         self._value_generator = value_generator
-    
+
     def create_simple_field(self) -> Any:
         """Create a simple field value."""
         field_type = random.choice([
             DataType.STRING, DataType.NUMBER, DataType.BOOLEAN, DataType.NULL
         ])
-        
+
         if field_type == DataType.STRING:
             return self._value_generator.generate_string()
         elif field_type == DataType.NUMBER:
@@ -263,7 +263,7 @@ class SimpleFieldGenerator:
 
 class DataGenerator:
     """Main data generator orchestrating the creation of test data."""
-    
+
     def __init__(self, num_fields: int, config: GeneratorConfig):
         self._validate_input(num_fields)
         self._field_counter = FieldCounter(num_fields)
@@ -273,7 +273,7 @@ class DataGenerator:
         self._array_generator = ArrayGenerator(self._value_generator)
         self._simple_generator = SimpleFieldGenerator(self._value_generator)
         self._metadata_generator = MetadataGenerator()
-    
+
     @staticmethod
     def _validate_input(num_fields: int) -> None:
         """Validate input parameters."""
@@ -281,58 +281,58 @@ class DataGenerator:
             raise TypeError(f"num_fields must be an integer, got {type(num_fields).__name__}")
         if num_fields <= 0:
             raise ValueError(f"num_fields must be a positive integer, got {num_fields}")
-    
+
     def generate(self) -> Dict[str, Any]:
         """Generate test data with the specified number of fields."""
         random.seed(42 + self._field_counter.target_fields)
         data_generated = {}
-        
+
         while self._field_counter.has_remaining_fields():
             field_name = f"field_{self._field_counter.fields_created}"
             field_value = self._create_field_value()
             data_generated[field_name] = field_value
-        
+
         data_generated["_metadata"] = self._metadata_generator.generate_metadata(
             self._field_counter.fields_created,
             self._field_counter.target_fields
         )
-        
+
         return data_generated
-    
+
     def _create_field_value(self) -> Any:
         """Create a field value based on remaining fields and probabilities."""
         remaining = self._field_counter.remaining_fields
-        
+
         if self._should_create_nested_object(remaining):
             return self._create_nested_object_field()
         elif self._should_create_array(remaining):
             return self._create_array_field()
         else:
             return self._create_simple_field()
-    
+
     def _should_create_nested_object(self, remaining_fields: int) -> bool:
         """Determine if a nested object should be created."""
-        return (remaining_fields > self._config.MIN_FIELDS_FOR_NESTED and 
+        return (remaining_fields > self._config.MIN_FIELDS_FOR_NESTED and
                 random.random() < self._config.NESTED_OBJECT_PROBABILITY)
-    
+
     def _should_create_array(self, remaining_fields: int) -> bool:
         """Determine if an array should be created."""
-        return (remaining_fields > self._config.MIN_FIELDS_FOR_ARRAY and 
+        return (remaining_fields > self._config.MIN_FIELDS_FOR_ARRAY and
                 random.random() < self._config.ARRAY_PROBABILITY)
-    
+
     def _create_nested_object_field(self) -> Dict[str, Any]:
         """Create a nested object field."""
         nested_data = self._nested_generator.create_nested_object(0, 3)
         if not isinstance(nested_data, dict) or not nested_data:
             self._field_counter.increment()
         return nested_data
-    
+
     def _create_array_field(self) -> List[Any]:
         """Create an array field."""
         array_data = self._array_generator.create_array(self._config.ARRAY_SIZE_RANGE)
         self._field_counter.increment()
         return array_data
-    
+
     def _create_simple_field(self) -> Any:
         """Create a simple field."""
         field_value = self._simple_generator.create_simple_field()
@@ -342,7 +342,7 @@ class DataGenerator:
 
 class ChunkSizeCalculator:
     """Calculates optimal chunk sizes for streaming."""
-    
+
     @staticmethod
     def calculate_chunk_size(data_size: int) -> int:
         """Calculate optimal chunk size based on data size."""
@@ -358,30 +358,30 @@ class ChunkSizeCalculator:
 
 class StreamingChunkGenerator:
     """Generates streaming chunks from JSON data."""
-    
+
     def __init__(self, chunk_calculator: ChunkSizeCalculator):
         self._chunk_calculator = chunk_calculator
-    
+
     def create_chunks(self, json_bytes: bytes, chunk_size: int = None) -> List[bytes]:
         """Split JSON bytes into chunks for streaming simulation."""
         if chunk_size is None:
             chunk_size = self._chunk_calculator.calculate_chunk_size(len(json_bytes))
-        
-        return [json_bytes[i:i + chunk_size] 
+
+        return [json_bytes[i:i + chunk_size]
                 for i in range(0, len(json_bytes), chunk_size)]
 
 
 class MixedComplexityDataGenerator:
     """Generates data with mixed complexity patterns."""
-    
+
     def __init__(self, config: GeneratorConfig):
         self._config = config
         self._value_generator = ValueGenerator(config.DEFAULT_STRING_VALUES)
-    
+
     def generate(self, num_fields: int) -> Dict[str, Any]:
         """Generate JSON data with mixed complexity patterns."""
         random.seed(42 + num_fields)
-        
+
         data = {
             "simple_fields": {},
             "arrays": {},
@@ -389,17 +389,17 @@ class MixedComplexityDataGenerator:
             "mixed_arrays": {},
             "deep_nesting": {}
         }
-        
+
         fields_per_section = num_fields // 5
-        
+
         self._populate_simple_fields(data["simple_fields"], fields_per_section)
         self._populate_arrays(data["arrays"], fields_per_section)
         self._populate_nested_objects(data["nested_objects"], fields_per_section)
         self._populate_mixed_arrays(data["mixed_arrays"], fields_per_section)
         self._populate_deep_nesting(data["deep_nesting"], num_fields - (fields_per_section * 4))
-        
+
         return data
-    
+
     @staticmethod
     def _populate_simple_fields(section: Dict[str, Any], count: int) -> None:
         """Populate a simple fields section."""
@@ -450,16 +450,16 @@ class MixedComplexityDataGenerator:
 
 class DataValidator:
     """Validates generated data against requirements."""
-    
+
     def __init__(self, config: GeneratorConfig):
         self._config = config
-    
+
     def validate(self, data: Dict[str, Any], expected_fields: int) -> bool:
         """Validate that generated data meets requirements."""
         actual_fields = self._count_fields(data)
         tolerance = max(1, int(expected_fields * self._config.TOLERANCE_PERCENTAGE))
         return abs(actual_fields - expected_fields) <= tolerance
-    
+
     def _count_fields(self, obj: Any) -> int:
         """Recursively count fields in a data structure."""
         if isinstance(obj, dict):
@@ -556,12 +556,12 @@ if __name__ == "__main__":
     # Demo with a small dataset
     demo_size = 100
     print(f"Generating demo dataset with {demo_size} fields...")
-    
+
     data = generate_test_data(demo_size)
     json_str = json.dumps(data, separators=(',', ':'))
     json_bytes = json_str.encode('utf-8')
     chunks = create_streaming_chunks(json_bytes)
-    
+
     print(f"✓ Generated {len(json_str):,} characters")
     print(f"✓ Created {len(chunks)} streaming chunks")
     print(f"✓ Validation: {'PASS' if validate_generated_data(data, demo_size) else 'FAIL'}")

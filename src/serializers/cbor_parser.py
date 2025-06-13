@@ -457,6 +457,7 @@ class MapTokenParser:
         reconstructor = PartialMapReconstructor()
         return reconstructor.reconstruct(map_tokens)
 
+
 class JsonReconstructor:
     """Reconstructs JSON strings from tokens."""
 
@@ -580,9 +581,10 @@ class PartialMapReconstructor:
     def _skip_comma(tokens: List[Dict[str, Any]], index: int) -> int:
         """Skip comma if present and return the next index."""
         if (index < len(tokens) and
-            tokens[index].get('value') == ','):
+                tokens[index].get('value') == ','):
             return index + 1
         return index
+
 
 class CborValidator:
     """Validates CBOR data structures."""

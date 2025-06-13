@@ -390,7 +390,7 @@ class StreamingJsonParser:
         new_data = self._processor.parse_single_threaded(self._buffer)
         if JsonValidator.has_content(new_data):
             self._parsed_data.update(new_data)
-    
+
     def get(self) -> Dict[str, Any]:
         """
         Return current parsed state as a Python object.

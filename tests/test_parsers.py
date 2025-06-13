@@ -6,35 +6,36 @@ Tests the basic interface and incremental parsing functionality.
 
 import pytest
 
+from src.serializers.bson_parser import StreamingJsonParser as BsonParser
+from src.serializers.cbor_parser import StreamingJsonParser as CborParser
+from src.serializers.flatbuffers_parser import StreamingJsonParser as FlatBuffersParser
 # Import all parser classes from the src package
 from src.serializers.json_parser import StreamingJsonParser as JsonParser
 from src.serializers.marshall_parser import StreamingJsonParser as MarshallParser
-from src.serializers.pickle_binary_mono_parser import StreamingJsonParser as PickleMonoParser
-from src.serializers.pickle_binary_multi_parser import StreamingJsonParser as PickleMultiParser
-from src.serializers.reactivex_parser import StreamingJsonParser as ReactiveXParser
-from src.serializers.protobuf_parser import StreamingJsonParser as ProtobufParser
-from src.serializers.flatbuffers_parser import StreamingJsonParser as FlatBuffersParser
-from src.serializers.bson_parser import StreamingJsonParser as BsonParser
-from src.serializers.cbor_parser import StreamingJsonParser as CborParser
-from src.serializers.ultrajson_parser import StreamingJsonParser as UltraJsonParser
 from src.serializers.msgpack_parser import StreamingJsonParser as MsgPackParser
 from src.serializers.parquet_parser import StreamingJsonParser as ParquetParser
+from src.serializers.pickle_binary_mono_parser import StreamingJsonParser as PickleMonoParser
+from src.serializers.pickle_binary_multi_parser import StreamingJsonParser as PickleMultiParser
+from src.serializers.protobuf_parser import StreamingJsonParser as ProtobufParser
+from src.serializers.reactivex_parser import StreamingJsonParser as ReactiveXParser
+from src.serializers.ultrajson_parser import StreamingJsonParser as UltraJsonParser
 
 # List of (parser class, human-readable name)
 parsers = [
-    (JsonParser,         "JSON Parser"),
-    (MarshallParser,     "Marshall Parser"),
-    (PickleMonoParser,   "Pickle Binary Mono Parser"),
-    (PickleMultiParser,  "Pickle Binary Multi Parser"),
-    (ReactiveXParser,    "ReactiveX Parser"),
-    (ProtobufParser,     "Protobuf Parser"),
-    (FlatBuffersParser,  "FlatBuffers Parser"),
-    (BsonParser,         "BSON Parser"),
-    (CborParser,         "CBOR Parser"),
-    (UltraJsonParser,    "Ultra-JSON Parser"),
-    (MsgPackParser,      "MsgPack Parser"),
-    (ParquetParser,      "Parquet Parser"),
+    (JsonParser, "JSON Parser"),
+    (MarshallParser, "Marshall Parser"),
+    (PickleMonoParser, "Pickle Binary Mono Parser"),
+    (PickleMultiParser, "Pickle Binary Multi Parser"),
+    (ReactiveXParser, "ReactiveX Parser"),
+    (ProtobufParser, "Protobuf Parser"),
+    (FlatBuffersParser, "FlatBuffers Parser"),
+    (BsonParser, "BSON Parser"),
+    (CborParser, "CBOR Parser"),
+    (UltraJsonParser, "Ultra-JSON Parser"),
+    (MsgPackParser, "MsgPack Parser"),
+    (ParquetParser, "Parquet Parser"),
 ]
+
 
 @pytest.mark.parametrize("parser_class,parser_name", parsers)
 def test_incremental_parsing(parser_class, parser_name):
