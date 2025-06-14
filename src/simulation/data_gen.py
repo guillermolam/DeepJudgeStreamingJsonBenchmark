@@ -15,6 +15,7 @@ Key Features:
 This is a production module used by the benchmarking system, not a test file.
 For testing this module, see tests/simulation/test_data_gen.py
 """
+from __future__ import annotations
 
 import json
 import random
@@ -215,7 +216,7 @@ class ArrayGenerator:
             if element_type == DataType.STRING:
                 array.append(self._value_generator.generate_string())
             elif element_type == DataType.NUMBER:
-                array.append(self._generate_array_number())
+                array.append(_generate_array_number())
             elif element_type == DataType.BOOLEAN:
                 array.append(self._value_generator.generate_boolean())
             elif element_type == DataType.OBJECT:
@@ -223,12 +224,12 @@ class ArrayGenerator:
 
         return array
 
-    @staticmethod
-    def _generate_array_number() -> int | float:
-        """Generate a number specifically for arrays."""
-        if random.random() < 0.5:
-            return random.randint(1, 10000)
-        return round(random.uniform(0.1, 999.9), 3)
+
+def _generate_array_number() -> int | float:
+    """Generate a number specifically for arrays."""
+    if random.random() < 0.5:
+        return random.randint(1, 10000)
+    return round(random.uniform(0.1, 999.9), 3)
 
 
 class SimpleFieldGenerator:
