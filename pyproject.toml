@@ -157,7 +157,7 @@ pythonpath = [
     "src",
     "src/serializers/anyio", # ← anyio implementation
     "src/serializers/raw", # ← raw implementation
-    "src/serializers/solid"                  # ← solid implementation
+    "src/serializers/solid"  # ← solid implementation
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]

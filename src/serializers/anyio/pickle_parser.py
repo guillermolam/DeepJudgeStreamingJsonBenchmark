@@ -1,7 +1,8 @@
-"""
-Ultra-JSON streaming parser implementation with anyio async operations.
 
-This module implements a streaming JSON parser with Ultra-JSON-style processing using anyio
+"""
+Pickle streaming parser implementation with anyio async operations.
+
+This module implements a streaming JSON parser with Pickle-style processing using anyio
 for async/multi-threading operations. It follows SOLID principles with clean separation
 of concerns and cognitive complexity under 14 for all methods.
 """
@@ -13,22 +14,22 @@ from typing import Any, Dict, Optional, List
 
 @dataclass
 class AsyncParserState:
-    """Immutable state container for async Ultra-JSON parser."""
+    """Immutable state container for async Pickle parser."""
     buffer: str = ""
     parsed_data: Dict[str, Any] = field(default_factory=dict)
 
 
-class AsyncUltraJsonValidator:
-    """Async validator for Ultra-JSON-style documents."""
+class AsyncPickleValidator:
+    """Async validator for Pickle-style documents."""
 
     @staticmethod
     async def is_valid_key(key: Any) -> bool:
-        """Async check if the key is valid for Ultra-JSON-style storage."""
+        """Async check if the key is valid for Pickle-style storage."""
         return isinstance(key, str) and len(key) > 0
 
     @staticmethod
     async def is_valid_value(value: Any) -> bool:
-        """Async check if the value is valid for Ultra-JSON-style storage."""
+        """Async check if the value is valid for Pickle-style storage."""
         if value is None or isinstance(value, (str, int, float, bool)):
             return True
         if isinstance(value, (list, dict)):
@@ -36,37 +37,37 @@ class AsyncUltraJsonValidator:
         return False
 
 
-class AsyncUltraJsonExtractor:
+class AsyncPickleExtractor:
     """Async extractor for complete key-value pairs."""
 
     @staticmethod
     async def extract_complete_pairs(obj: Dict[str, Any]) -> Dict[str, Any]:
-        """Async extract complete key-value pairs with Ultra-JSON-style validation."""
+        """Async extract complete key-value pairs with Pickle-style validation."""
         if not isinstance(obj, dict):
             return {}
 
         result = {}
         async with anyio.create_task_group() as tg:
             for key, value in obj.items():
-                tg.start_soon(AsyncUltraJsonExtractor._process_pair, key, value, result)
+                tg.start_soon(AsyncPickleExtractor._process_pair, key, value, result)
 
         return result
 
     @staticmethod
     async def _process_pair(key: str, value: Any, result: Dict[str, Any]) -> None:
         """Process a single key-value pair asynchronously."""
-        if await AsyncUltraJsonValidator.is_valid_key(key) and await AsyncUltraJsonValidator.is_valid_value(value):
+        if await AsyncPickleValidator.is_valid_key(key) and await AsyncPickleValidator.is_valid_value(value):
             result[key] = value
 
 
-class AsyncUltraJsonParser:
-    """Async parser for individual Ultra-JSON-style documents."""
+class AsyncPickleParser:
+    """Async parser for individual Pickle-style documents."""
 
-    def __init__(self, extractor: AsyncUltraJsonExtractor = None):
-        self._extractor = extractor or AsyncUltraJsonExtractor()
+    def __init__(self, extractor: AsyncPickleExtractor = None):
+        self._extractor = extractor or AsyncPickleExtractor()
 
     async def parse_document(self, doc_str: str) -> Dict[str, Any]:
-        """Async parse a Ultra-JSON-style document."""
+        """Async parse a Pickle-style document."""
         parsed_obj = await self._try_direct_parse_async(doc_str)
         if parsed_obj:
             return await self._extractor.extract_complete_pairs(parsed_obj)
@@ -112,14 +113,14 @@ class AsyncUltraJsonParser:
         return None
 
 
-class AsyncUltraJsonProcessor:
-    """Main async processor using Ultra-JSON-inspired document processing."""
+class AsyncPickleProcessor:
+    """Main async processor using Pickle-inspired document processing."""
 
-    def __init__(self, parser: AsyncUltraJsonParser = None):
-        self._parser = parser or AsyncUltraJsonParser()
+    def __init__(self, parser: AsyncPickleParser = None):
+        self._parser = parser or AsyncPickleParser()
 
     async def process_buffer(self, buffer: str) -> Dict[str, Any]:
-        """Async process buffer using Ultra-JSON-inspired document structure."""
+        """Async process buffer using Pickle-inspired document structure."""
         documents = await self._extract_documents_async(buffer)
         
         parsed_data = {}
@@ -178,12 +179,12 @@ class AsyncUltraJsonProcessor:
 
 
 class StreamingJsonParser:
-    """Async streaming JSON parser with Ultra-JSON-inspired processing."""
+    """Async streaming JSON parser with Pickle-inspired processing."""
 
-    def __init__(self, processor: AsyncUltraJsonProcessor = None):
+    def __init__(self, processor: AsyncPickleProcessor = None):
         """Initialize the async streaming JSON parser."""
         self._state = AsyncParserState()
-        self._processor = processor or AsyncUltraJsonProcessor()
+        self._processor = processor or AsyncPickleProcessor()
 
     def consume(self, buffer: str) -> None:
         """Process a chunk of JSON data incrementally."""

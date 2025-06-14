@@ -1,135 +1,88 @@
+
 """
-Parquet streaming parser implementation.
-Note: Parquet is columnar storage format, so this implements JSON parsing
-with Parquet-inspired columnar processing and metadata handling.
+Parquet streaming parser implementation with SOLID principles.
+
+This module implements a streaming JSON parser inspired by Parquet columnar storage format.
+It follows SOLID principles with clean separation of concerns, stateless operations where possible,
+and cognitive complexity under 14 for all methods.
+
+Key Features:
+- Columnar processing inspired by Parquet
+- Incremental JSON parsing with message-based processing
+- Stateless utility functions and processors
+- Clean separation between message extraction, validation, and data processing
+- Comprehensive error handling and recovery
+
+Architecture:
+- ParserState: Immutable state container using @dataclass
+- Static utility classes for message validation and value parsing
+- Dependency injection for loose coupling
+- Single responsibility principle throughout
 """
 import json
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, List, Union
 
 
 @dataclass
 class ParserState:
-    """Holds state for the Parquet parser."""
-
+    """Immutable state container for the Parquet parser."""
     buffer: str = ""
     parsed_data: Dict[str, Any] = field(default_factory=dict)
-    binary_stream: bytearray = field(default_factory=bytearray)
-
-
-class MessagePackType(Enum):
-    """MsgPack type constants for better readability."""
-    FIXMAP = 0x80
-    FIXARRAY = 0x90
-    FIXSTR = 0xa0
-    NIL = 0xc0
-    FALSE = 0xc2
-    TRUE = 0xc3
-    FLOAT32 = 0xca
-    FLOAT64 = 0xcb
-    UINT8 = 0xcc
-    UINT16 = 0xcd
-    UINT32 = 0xce
-    UINT64 = 0xcf
-
-
-@dataclass
-class _ScanState:
-    """Internal state holder for message extraction."""
-    current: list[str]  # incremental chars of the current JSON snippet
-    brace_count: int  # open–close brace balance
-    in_string: bool  # inside a '"' string?
-    escape_next: bool  # the previous char was a backslash?
 
 
 @dataclass(frozen=True)
 class ParsedMessage:
-    """Immutable data_gen structure for parsed messages."""
+    """Immutable data structure for parsed messages."""
     content: str
     is_complete: bool
     brace_count: int
 
 
-class MessageExtractor:
-    """Pure functions for message extraction with improved readability."""
+class MessageValidator:
+    """Stateless validator for Parquet-style messages."""
 
     @staticmethod
-    def extract_messages(text: str) -> List[ParsedMessage]:
-        """Extract complete JSON messages from text data_gen."""
-        if not text:
-            return []
-
-        state = _ScanState(current=[], brace_count=0, in_string=False, escape_next=False)
-        messages: List[ParsedMessage] = []
-
-        for ch in text:
-            MessageExtractor._consume_char(ch, state, messages)
-
-        # Push the trailing incomplete chunk (if any)
-        trailing = MessageExtractor._flush(state)
-        if trailing:
-            messages.append(trailing)
-
-        return messages
+    def is_valid_key(key: str) -> bool:
+        """Validate if a key is valid for columnar storage."""
+        return isinstance(key, str) and len(key) > 0
 
     @staticmethod
-    def _consume_char(
-            ch: str,
-            st: _ScanState,
-            out: List[ParsedMessage]
-    ) -> None:
-        """Process a single character and update state."""
-        st.current.append(ch)
+    def is_valid_value(value: Any) -> bool:
+        """Check if the value is valid for columnar storage."""
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return True
 
-        if st.escape_next:  # the previous char was '\'
-            st.escape_next = False
-            return
+        if isinstance(value, list):
+            return all(MessageValidator.is_valid_value(item) for item in value)
 
-        if ch == '\\':  # start of an escape
-            st.escape_next = True
-            return
+        if isinstance(value, dict):
+            return all(
+                isinstance(k, str) and MessageValidator.is_valid_value(v)
+                for k, v in value.items()
+            )
 
-        if ch == '"' and not st.escape_next:  # toggle string mode
-            st.in_string = not st.in_string
-            return
+        return False
 
-        if st.in_string:  # ignore everything inside strings
-            return
 
-        st.brace_count = MessageExtractor._update_braces(ch, st.brace_count)
-        if st.brace_count == 0:
-            complete = MessageExtractor._flush(st, is_complete=True)
-            if complete:
-                out.append(complete)
+class PairExtractor:
+    """Extracts complete key-value pairs from objects using stateless operations."""
 
     @staticmethod
-    def _update_braces(ch: str, count: int) -> int:
-        """Pure function to update brace count."""
-        if ch == '{':
-            return count + 1
-        if ch == '}':
-            return count - 1
-        return count
+    def extract_complete_pairs(obj: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract complete key-value pairs with columnar validation."""
+        if not isinstance(obj, dict):
+            return {}
 
-    @staticmethod
-    def _flush(st: _ScanState, is_complete: bool = False) -> Optional[ParsedMessage]:
-        """Return a ParsedMessage if there is anything buffered, then reset buffer."""
-        if not st.current:
-            return None
-
-        content = ''.join(st.current).strip()
-        st.current.clear()  # reset for the next fragment
-        return ParsedMessage(
-            content=content,
-            is_complete=is_complete or st.brace_count == 0,
-            brace_count=st.brace_count
-        )
+        return {
+            key: value
+            for key, value in obj.items()
+            if MessageValidator.is_valid_key(key) and MessageValidator.is_valid_value(value)
+        }
 
 
 class ValueParser:
-    """Pure functions for value parsing."""
+    """Stateless utility for parsing values in columnar format."""
 
     @staticmethod
     def parse_value(value_str: str) -> Any:
@@ -176,41 +129,105 @@ class ValueParser:
             return None
 
 
-class MessageValidator:
-    """Pure functions for message validation."""
+class MessageExtractor:
+    """Stateless utility for extracting complete JSON messages."""
 
     @staticmethod
-    def is_valid_value(value: Any) -> bool:
-        """Check if the value is valid for MsgPack encoding."""
-        if value is None or isinstance(value, (str, int, float, bool)):
+    def extract_messages(text: str) -> List[ParsedMessage]:
+        """Extract complete JSON messages from text data."""
+        if not text:
+            return []
+
+        extractor = MessageExtractionState()
+
+        for ch in text:
+            extractor.process_character(ch)
+
+        extractor.finalize()
+        return extractor.get_messages()
+
+    @staticmethod
+    def _update_braces(ch: str, count: int) -> int:
+        """Update brace count based on character."""
+        if ch == '{':
+            return count + 1
+        if ch == '}':
+            return count - 1
+        return count
+
+
+class MessageExtractionState:
+    """Handles message extraction state for MessageExtractor."""
+
+    def __init__(self):
+        self.messages = []
+        self.current_chars = []
+        self.brace_count = 0
+        self.in_string = False
+        self.escape_next = False
+
+    def process_character(self, ch: str) -> None:
+        """Process a single character."""
+        self.current_chars.append(ch)
+
+        if self.escape_next:
+            self.escape_next = False
+            return
+
+        if ch == '\\':
+            self.escape_next = True
+            return
+
+        if self._is_string_delimiter(ch):
+            return
+
+        if self.in_string:
+            return
+
+        self._handle_brace_character(ch)
+
+    def _is_string_delimiter(self, ch: str) -> bool:
+        """Handle string delimiter character."""
+        if ch == '"' and not self.escape_next:
+            self.in_string = not self.in_string
             return True
-
-        if isinstance(value, list):
-            return all(MessageValidator.is_valid_value(item) for item in value)
-
-        if isinstance(value, dict):
-            return all(
-                isinstance(k, str) and MessageValidator.is_valid_value(v)
-                for k, v in value.items()
-            )
-
         return False
 
-    @staticmethod
-    def extract_complete_pairs(obj: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract only complete and valid key-value pairs."""
-        if not isinstance(obj, dict):
-            return {}
+    def _handle_brace_character(self, ch: str) -> None:
+        """Handle brace characters for message parsing."""
+        self.brace_count = MessageExtractor._update_braces(ch, self.brace_count)
+        if self.brace_count == 0 and len(self.current_chars) > 1:
+            self._complete_message()
 
-        return {
-            key: value
-            for key, value in obj.items()
-            if isinstance(key, str) and len(key) > 0 and MessageValidator.is_valid_value(value)
-        }
+    def _complete_message(self) -> None:
+        """Complete the current message."""
+        content = ''.join(self.current_chars).strip()
+        if content:
+            self.messages.append(ParsedMessage(
+                content=content,
+                is_complete=True,
+                brace_count=0
+            ))
+        self.current_chars.clear()
+
+    def finalize(self) -> None:
+        """Finalize extraction and handle remaining incomplete message."""
+        if self.current_chars:
+            content = ''.join(self.current_chars).strip()
+            if content:
+                self.messages.append(ParsedMessage(
+                    content=content,
+                    is_complete=self.brace_count == 0,
+                    brace_count=self.brace_count
+                ))
+
+    def get_messages(self) -> List[ParsedMessage]:
+        """Get the list of extracted messages."""
+        return self.messages
 
 
 class MessageFormatter:
-    """Pure functions for message formatting."""
+    """Stateless utility for message formatting."""
 
     @staticmethod
     def correct_format(message: str) -> Optional[str]:
@@ -230,7 +247,7 @@ class MessageFormatter:
 
 
 class FieldExtractor:
-    """Pure functions for field extraction."""
+    """Stateless utility for field extraction from malformed JSON."""
 
     @staticmethod
     def extract_fields(message: str) -> Dict[str, Any]:
@@ -250,7 +267,7 @@ class FieldExtractor:
         return result
 
     @staticmethod
-    def _extract_key_value_from_line(line: str) -> Optional[tuple[str, Any]]:
+    def _extract_key_value_from_line(line: str) -> Optional[tuple]:
         """Extract a key-value pair from a single line."""
         if not line or ':' not in line or '"' not in line:
             return None
@@ -271,36 +288,33 @@ class FieldExtractor:
 
             return (key, value) if value is not None else None
 
-        except (IndexError, AttributeError):  # More specific exceptions
+        except (IndexError, AttributeError):
             return None
 
 
-class IMessageDecoder(ABC):
-    """Interface for message decoders (Interface Segregation Principle)."""
-
-    @abstractmethod
-    def decode(self, message: ParsedMessage) -> Dict[str, Any]:
-        """Decode a message to key-value pairs."""
-        pass
-
-
-class JsonMessageDecoder(IMessageDecoder):
+class JsonMessageDecoder:
     """Decoder for complete JSON messages."""
+
+    def __init__(self, pair_extractor: PairExtractor = None):
+        self._pair_extractor = pair_extractor or PairExtractor()
 
     def decode(self, message: ParsedMessage) -> Dict[str, Any]:
         """Decode complete JSON message."""
         try:
             obj = json.loads(message.content)
             if isinstance(obj, dict):
-                return MessageValidator.extract_complete_pairs(obj)
+                return self._pair_extractor.extract_complete_pairs(obj)
         except json.JSONDecodeError:
             pass
 
         return {}
 
 
-class PartialMessageDecoder(IMessageDecoder):
+class PartialMessageDecoder:
     """Decoder for partial/malformed JSON messages."""
+
+    def __init__(self, pair_extractor: PairExtractor = None):
+        self._pair_extractor = pair_extractor or PairExtractor()
 
     def decode(self, message: ParsedMessage) -> Dict[str, Any]:
         """Decode partial JSON message."""
@@ -310,7 +324,7 @@ class PartialMessageDecoder(IMessageDecoder):
             try:
                 obj = json.loads(corrected)
                 if isinstance(obj, dict):
-                    return MessageValidator.extract_complete_pairs(obj)
+                    return self._pair_extractor.extract_complete_pairs(obj)
             except json.JSONDecodeError:
                 pass
 
@@ -318,32 +332,42 @@ class PartialMessageDecoder(IMessageDecoder):
         return FieldExtractor.extract_fields(message.content)
 
 
-class MessageDecoderFactory:
-    """Factory for creating appropriate decoders (Factory Pattern)."""
+class ParquetStyleProcessor:
+    """Main processor using Parquet-inspired columnar processing with dependency injection."""
 
-    @staticmethod
-    def create_decoder(message: ParsedMessage) -> IMessageDecoder:
-        """Create the appropriate decoder based on message completeness."""
+    def __init__(self,
+                 message_extractor: MessageExtractor = None,
+                 json_decoder: JsonMessageDecoder = None,
+                 partial_decoder: PartialMessageDecoder = None):
+        self._message_extractor = message_extractor or MessageExtractor()
+        self._json_decoder = json_decoder or JsonMessageDecoder()
+        self._partial_decoder = partial_decoder or PartialMessageDecoder()
+
+    def process_buffer(self, buffer: str) -> Dict[str, Any]:
+        """Process buffer using columnar approach."""
+        messages = self._message_extractor.extract_messages(buffer)
+        parsed_data = {}
+
+        for message in messages:
+            decoded_data = self._decode_message(message)
+            parsed_data.update(decoded_data)
+
+        return parsed_data
+
+    def _decode_message(self, message: ParsedMessage) -> Dict[str, Any]:
+        """Decode a single message using the appropriate decoder."""
         if message.is_complete:
-            return JsonMessageDecoder()
-        return PartialMessageDecoder()
+            return self._json_decoder.decode(message)
+        return self._partial_decoder.decode(message)
 
 
 class StreamingJsonParser:
-    """
-    Streaming JSON parser with MsgPack-inspired compact binary encoding.
+    """Streaming JSON parser with Parquet-inspired columnar processing."""
 
-    This class follows SOLID principles:
-    - Single Responsibility: Only handles the main parsing workflow
-    - Open/Closed: Extensible through decoder interfaces
-    - Liskov Substitution: Decoders are interchangeable
-    - Interface Segregation: Separate interfaces for different concerns
-    - Dependency Inversion: Depends on abstractions, not concretions
-    """
-
-    def __init__(self):
-        """Initialize the streaming JSON parser."""
+    def __init__(self, processor: ParquetStyleProcessor = None):
+        """Initialize the streaming JSON parser with dependency injection."""
         self._state = ParserState()
+        self._processor = processor or ParquetStyleProcessor()
 
     @property
     def _buffer(self) -> str:
@@ -357,23 +381,20 @@ class StreamingJsonParser:
     def _parsed_data(self) -> Dict[str, Any]:
         return self._state.parsed_data
 
-    @property
-    def _binary_stream(self) -> bytearray:
-        return self._state.binary_stream
-
     def consume(self, buffer: str) -> None:
         """
-        Process a chunk of JSON data_gen incrementally.
+        Process a chunk of JSON data incrementally using columnar processing.
 
         Args:
-            buffer: String chunk of JSON data_gen to process
+            buffer: String chunk of JSON data to process
         """
         if not buffer:
             return
 
         self._buffer += buffer
-        self._update_binary_stream(buffer)
-        self._process_messages()
+        new_data = self._processor.process_buffer(self._buffer)
+        if new_data:
+            self._parsed_data.update(new_data)
 
     def get(self) -> Dict[str, Any]:
         """
@@ -388,27 +409,3 @@ class StreamingJsonParser:
     def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
         """Return a dict sorted by keys for deterministic output."""
         return {k: data[k] for k in sorted(data.keys())}
-
-    def _update_binary_stream(self, buffer: str) -> None:
-        """Update binary stream with new buffer data_gen."""
-        buffer_bytes = buffer.encode('utf-8')
-        self._binary_stream.extend(buffer_bytes)
-
-    def _process_messages(self) -> None:
-        """Process all messages in the current buffer."""
-        try:
-            text_data = self._binary_stream.decode('utf-8', errors='ignore')
-            messages = MessageExtractor.extract_messages(text_data)
-
-            for message in messages:
-                decoded_data = self._decode_message(message)
-                self._parsed_data.update(decoded_data)
-
-        except (UnicodeDecodeError, AttributeError, TypeError):
-            pass
-
-    @staticmethod
-    def _decode_message(message: ParsedMessage) -> Dict[str, Any]:
-        """Decode a single message using the appropriate decoder."""
-        decoder = MessageDecoderFactory.create_decoder(message)
-        return decoder.decode(message)

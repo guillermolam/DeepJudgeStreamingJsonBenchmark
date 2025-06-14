@@ -1,7 +1,8 @@
-"""
-Ultra-JSON streaming parser implementation with anyio async operations.
 
-This module implements a streaming JSON parser with Ultra-JSON-style processing using anyio
+"""
+MessagePack streaming parser implementation with anyio async operations.
+
+This module implements a streaming JSON parser with MessagePack-style processing using anyio
 for async/multi-threading operations. It follows SOLID principles with clean separation
 of concerns and cognitive complexity under 14 for all methods.
 """
@@ -13,22 +14,22 @@ from typing import Any, Dict, Optional, List
 
 @dataclass
 class AsyncParserState:
-    """Immutable state container for async Ultra-JSON parser."""
+    """Immutable state container for async MessagePack parser."""
     buffer: str = ""
     parsed_data: Dict[str, Any] = field(default_factory=dict)
 
 
-class AsyncUltraJsonValidator:
-    """Async validator for Ultra-JSON-style documents."""
+class AsyncMsgPackValidator:
+    """Async validator for MessagePack-style documents."""
 
     @staticmethod
     async def is_valid_key(key: Any) -> bool:
-        """Async check if the key is valid for Ultra-JSON-style storage."""
+        """Async check if the key is valid for MessagePack-style storage."""
         return isinstance(key, str) and len(key) > 0
 
     @staticmethod
     async def is_valid_value(value: Any) -> bool:
-        """Async check if the value is valid for Ultra-JSON-style storage."""
+        """Async check if the value is valid for MessagePack-style storage."""
         if value is None or isinstance(value, (str, int, float, bool)):
             return True
         if isinstance(value, (list, dict)):
@@ -36,37 +37,37 @@ class AsyncUltraJsonValidator:
         return False
 
 
-class AsyncUltraJsonExtractor:
+class AsyncMsgPackExtractor:
     """Async extractor for complete key-value pairs."""
 
     @staticmethod
     async def extract_complete_pairs(obj: Dict[str, Any]) -> Dict[str, Any]:
-        """Async extract complete key-value pairs with Ultra-JSON-style validation."""
+        """Async extract complete key-value pairs with MessagePack-style validation."""
         if not isinstance(obj, dict):
             return {}
 
         result = {}
         async with anyio.create_task_group() as tg:
             for key, value in obj.items():
-                tg.start_soon(AsyncUltraJsonExtractor._process_pair, key, value, result)
+                tg.start_soon(AsyncMsgPackExtractor._process_pair, key, value, result)
 
         return result
 
     @staticmethod
     async def _process_pair(key: str, value: Any, result: Dict[str, Any]) -> None:
         """Process a single key-value pair asynchronously."""
-        if await AsyncUltraJsonValidator.is_valid_key(key) and await AsyncUltraJsonValidator.is_valid_value(value):
+        if await AsyncMsgPackValidator.is_valid_key(key) and await AsyncMsgPackValidator.is_valid_value(value):
             result[key] = value
 
 
-class AsyncUltraJsonParser:
-    """Async parser for individual Ultra-JSON-style documents."""
+class AsyncMsgPackParser:
+    """Async parser for individual MessagePack-style documents."""
 
-    def __init__(self, extractor: AsyncUltraJsonExtractor = None):
-        self._extractor = extractor or AsyncUltraJsonExtractor()
+    def __init__(self, extractor: AsyncMsgPackExtractor = None):
+        self._extractor = extractor or AsyncMsgPackExtractor()
 
     async def parse_document(self, doc_str: str) -> Dict[str, Any]:
-        """Async parse a Ultra-JSON-style document."""
+        """Async parse a MessagePack-style document."""
         parsed_obj = await self._try_direct_parse_async(doc_str)
         if parsed_obj:
             return await self._extractor.extract_complete_pairs(parsed_obj)
@@ -112,14 +113,14 @@ class AsyncUltraJsonParser:
         return None
 
 
-class AsyncUltraJsonProcessor:
-    """Main async processor using Ultra-JSON-inspired document processing."""
+class AsyncMsgPackProcessor:
+    """Main async processor using MessagePack-inspired document processing."""
 
-    def __init__(self, parser: AsyncUltraJsonParser = None):
-        self._parser = parser or AsyncUltraJsonParser()
+    def __init__(self, parser: AsyncMsgPackParser = None):
+        self._parser = parser or AsyncMsgPackParser()
 
     async def process_buffer(self, buffer: str) -> Dict[str, Any]:
-        """Async process buffer using Ultra-JSON-inspired document structure."""
+        """Async process buffer using MessagePack-inspired document structure."""
         documents = await self._extract_documents_async(buffer)
         
         parsed_data = {}
@@ -178,12 +179,12 @@ class AsyncUltraJsonProcessor:
 
 
 class StreamingJsonParser:
-    """Async streaming JSON parser with Ultra-JSON-inspired processing."""
+    """Async streaming JSON parser with MessagePack-inspired processing."""
 
-    def __init__(self, processor: AsyncUltraJsonProcessor = None):
+    def __init__(self, processor: AsyncMsgPackProcessor = None):
         """Initialize the async streaming JSON parser."""
         self._state = AsyncParserState()
-        self._processor = processor or AsyncUltraJsonProcessor()
+        self._processor = processor or AsyncMsgPackProcessor()
 
     def consume(self, buffer: str) -> None:
         """Process a chunk of JSON data incrementally."""

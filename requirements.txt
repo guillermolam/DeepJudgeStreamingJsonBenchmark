@@ -29,3 +29,7 @@ isort>=5.10.0
 pre-commit>=2.20.0
 
 click~=8.2.1
+trio~=0.30.0
+anyio~=4.9.0
+
+triotp~=0.3.1
