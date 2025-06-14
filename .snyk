@@ -1,0 +1,13 @@
+exclude:
+  directories:
+    - .venv
+    - .trunk
+    - .git
+    - .code
+    - .idea
+    - .vscode
+    - docs
+    - "**/__pycache__"
+  files:
+    - "**/*.pyc"
+    - "**/*.log"
