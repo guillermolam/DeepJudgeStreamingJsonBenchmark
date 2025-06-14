@@ -139,10 +139,14 @@ class ParserDiscovery:
     """Handles discovery and loading of parser implementations."""
 
     PARSER_FILES = [
-        'bson_parser', 'cbor_parser', 'flatbuffers_parser', 'json_parser',
-        'marshall_parser', 'msgpack_parser', 'parquet_parser',
-        'pickle_binary_mono_parser', 'pickle_binary_multi_parser',
-        'protobuf_parser', 'reactivex_parser', 'ultrajson_parser'
+        'bson_parser',
+        'cbor_parser',
+        'flatbuffers_parser',
+        'msgpack_parser',
+        'parquet_parser',
+        'pickle_parser',
+        'protobuf_parser',
+        'ultrajson_parser'
     ]
 
     def discover_parsers(self) -> Dict[str, type]:

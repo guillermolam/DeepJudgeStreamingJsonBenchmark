@@ -97,7 +97,8 @@ class AsyncPickleParser:
 
         return {}
 
-    async def _balance_braces_async(self, doc_str: str) -> Optional[str]:
+    @staticmethod
+    async def _balance_braces_async(doc_str: str) -> Optional[str]:
         """Async balance JSON braces in document."""
         if '{' not in doc_str:
             return None
@@ -132,7 +133,7 @@ class AsyncPickleProcessor:
 
     async def _extract_documents_async(self, text: str) -> List[str]:
         """Async extract JSON documents from text."""
-        return await anyio.to_thread.run_sync(self._extract_documents_sync, text)
+        return await anyio.ru.to_thread.run_sync(self._extract_documents_sync, text)
 
     @staticmethod
     def _extract_documents_sync(text: str) -> List[str]:

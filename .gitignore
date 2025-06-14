@@ -48,3 +48,5 @@ qodo/*
 .qodo/**/*.py
 .qodo/*.ipynb
 .qodo/**/*.ipynb
+*.xml
+*.iml
