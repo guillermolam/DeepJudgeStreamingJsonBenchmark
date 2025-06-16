@@ -8,6 +8,7 @@ metrics including performance, throughput, CPU usage, and network simulation.
 import os
 import sys
 from pathlib import Path
+from typing import Dict, Optional, Type
 
 # Ensure `src/` is in sys.path so imports like `serializers.json_parser` work
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -20,7 +21,7 @@ import time
 import traceback
 import tracemalloc
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, List, Any, Optional, Tuple
+from typing import List, Any, Tuple
 from dataclasses import dataclass
 
 import psutil
@@ -136,46 +137,43 @@ class BenchmarkMetrics:
 
 
 class ParserDiscovery:
-    """Handles discovery and loading of parser implementations."""
+    BASE_PACKAGE = "serializers"
+    SUBMODULES = ["raw", "solid", "anyio"]
 
-    PARSER_FILES = [
-        'bson_parser',
-        'cbor_parser',
-        'flatbuffers_parser',
-        'msgpack_parser',
-        'parquet_parser',
-        'pickle_parser',
-        'protobuf_parser',
-        'ultrajson_parser'
-    ]
+    def discover_parsers(self) -> Dict[str, Type]:
+        parsers: Dict[str, Type] = {}
 
-    def discover_parsers(self) -> Dict[str, type]:
-        """Dynamically discover and load all parser implementations."""
-        parsers = {}
-
-        for parser_name in self.PARSER_FILES:
-            parser_class = self._load_parser(parser_name)
-            if parser_class:
-                parsers[parser_name] = parser_class
-                print(f"✓ Loaded parser: {parser_name}")
+        for sub, module_name, full_mod_path in self._iter_module_paths():
+            parser_cls = self._load_parser_class(full_mod_path)
+            if parser_cls:
+                parsers[module_name] = parser_cls
+                print(f"✓ Loaded parser: {sub}.{module_name}")
             else:
-                print(f"✗ Failed to load parser: {parser_name}")
+                print(f"✗ Skipped parser: {sub}.{module_name}")
 
         print(f"\nLoaded {len(parsers)} parsers successfully")
         return parsers
 
+    def _iter_module_paths(self):
+        root = Path(__file__).parent / self.BASE_PACKAGE
+        for sub in self.SUBMODULES:
+            pkg_dir = root / sub
+            if not pkg_dir.is_dir():
+                continue
+            for py_file in pkg_dir.glob("*.py"):
+                if py_file.name == "__init__.py":
+                    continue
+                module_name = py_file.stem
+                full_mod_path = f"{self.BASE_PACKAGE}.{sub}.{module_name}"
+                yield sub, module_name, full_mod_path
+
     @staticmethod
-    def _load_parser(parser_name: str) -> Optional[type]:
-        """Load a single parser implementation."""
+    def _load_parser_class(full_mod_path: str) -> Optional[Type]:
         try:
-            module = importlib.import_module(f"src.serializers.{parser_name}")
-            if hasattr(module, 'StreamingJsonParser'):
-                return module.StreamingJsonParser
-            else:
-                print(f"✗ No StreamingJsonParser class found in {parser_name}")
-                return None
-        except Exception as e:
-            print(f"✗ Failed to load {parser_name}: {e}")
+            module = importlib.import_module(full_mod_path)
+            return getattr(module, "StreamingJsonParser", None)
+        except ImportError as e:
+            print(f"ImportError: {e}")
             return None
 
 
@@ -714,8 +712,8 @@ def main():
         )
 
         # Create output directory if it doesn't exist
-        if not sanitized_output_path.exists():
-            sanitized_output_path.mkdir(parents=True, exist_ok=True)
+        if not sanitized_output_path:
+            Path(sanitized_output_path).mkdir(parents=True, exist_ok=True)
 
         print(f"📁 Using sanitized output directory: {sanitized_output_path}")
 

@@ -278,8 +278,8 @@ async def test_asyncio_lock():
 
     # Acquire lock before starting workers
     await lock.acquire()
-    t1 = asyncio.create_task(worker('first'))
-    t2 = asyncio.create_task(worker('second'))
+    asyncio.create_task(worker('first'))
+    asyncio.create_task(worker('second'))
 
     # Let tasks queue behind the lock
     await asyncio.sleep(0)

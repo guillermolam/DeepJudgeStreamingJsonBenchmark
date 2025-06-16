@@ -1,0 +1,87 @@
+version: '3'
+
+tasks:
+
+  default:
+    desc: Run bootstrap then CI
+    deps: [ bootstrap, ci ]
+
+  bootstrap:
+    desc: Verify global tools and prepare venv
+    deps: [ verify:winget, verify:task, verify:act, setup:venv ]
+
+  verify:winget:
+    desc: Ensure winget is installed
+    platforms: [ windows ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "winget --version"
+
+  verify:task:
+    desc: Ensure Go-Task CLI is installed
+    platforms: [ windows ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "task --version"
+
+  verify:act:
+    desc: Ensure nektos.act (`act`) is installed
+    platforms: [ windows ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "act --version"
+
+  setup:venv:
+    desc: Create Python .venv if missing
+    platforms: [ windows ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "if (-not (Test-Path '.venv')) { python -m venv .venv; Write-Host '→ Created .venv' } else { Write-Host '✔ .venv exists' }"
+
+  setup:deps:
+    desc: Bootstrap pip & uv, then install via requirements.txt
+    platforms: [ windows ]
+    deps: [ setup:venv ]
+    cmds:
+      - cmd: |
+          pwsh -NoProfile -Command "& {
+          # 1) Bootstrap pip & uv into the venv
+          .\.venv\Scripts\python.exe -m ensurepip --upgrade;
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel uv;
+          Write-Host '✔ pip, setuptools, wheel & uv bootstrapped';
+
+          # 2) Ensure uv.exe is present
+          if (-not (Test-Path '.venv\Scripts\uv.exe')) {
+          .\.venv\Scripts\python.exe -m pip install uv;
+          Write-Host '→ Installed uv';
+          } else {
+          Write-Host '✔ uv already installed';
+          }
+          .\.venv\Scripts\uv.exe --version;
+
+          # 3) Install everything from requirements.txt (core + dev)
+          .\.venv\Scripts\uv.exe pip install --requirement requirements.txt
+          Write-Host '✔ project & dev dependencies installed via requirements.txt';
+          }"
+  
+
+  configure:act:
+    desc: Ensure `.actrc` has the correct pull & runner mappings (idempotent)
+    platforms: [ windows ]
+    status:
+      - "Test-Path .actrc"
+      - "Select-String -Path .actrc -Pattern '--pull never' -Quiet"
+      - "Select-String -Path .actrc -Pattern '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest' -Quiet"
+    cmds:
+      - cmd: pwsh -NoProfile -Command "if (-not (Test-Path '.actrc')) { Out-File .actrc -Encoding utf8 -Force }"
+      - cmd: pwsh -NoProfile -Command "if (-not (Select-String -Path .actrc -Pattern '^\s*--pull never\s*$' -Quiet)) { Add-Content .actrc '--pull never' }"
+      - cmd: pwsh -NoProfile -Command "if (-not (Select-String -Path .actrc -Pattern '^\s*-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest\s*$' -Quiet)) { Add-Content .actrc '-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest' }"
+      - cmd: pwsh -NoProfile -Command "Write-Host '✔ .actrc up-to-date'"
+
+
+  ci:
+    desc: Run CI locally via act
+    platforms: [ windows ]
+    deps: [ setup:deps, configure:act ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "act -j build-and-test --env RUST_LOG=info"
+
+
+
+

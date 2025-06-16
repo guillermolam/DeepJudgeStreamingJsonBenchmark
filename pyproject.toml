@@ -155,6 +155,7 @@ minversion = "7.0"
 addopts = "-ra -q --strict-markers --strict-config"
 pythonpath = [
     "src",
+    "src/serializers",
     "src/serializers/anyio", # ← anyio implementation
     "src/serializers/raw", # ← raw implementation
     "src/serializers/solid"  # ← solid implementation
@@ -192,4 +193,40 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.pylint.messages_control]
+disable = [
+    "arguments-differ",
+    "attribute-defined-outside-init",
+    "bad-continuation",
+    "blacklisted-name",
+    "duplicate-code",
+    "fixme",
+    "import-error",
+    "no-member",
+    "no-name-in-module",
+    "no-self-use",
+    "protected-access",
+    "stop-iteration-return",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-lines",
+    "too-many-locals",
+    "too-many-return-statements",
+    "too-many-statements",
+    "abstract-method",
+    "chained-comparison",
+    "eval-used",
+    "exec-used",
+    "expression-not-assigned",
+    "global-statement",
+    "missing-docstring",
+    "redefined-argument-from-local",
+    "redefined-outer-name",
+    "reimported",
+    "too-many-ancestors",
+    "unexpected-special-method-signature",
 ]

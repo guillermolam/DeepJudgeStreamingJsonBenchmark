@@ -74,7 +74,8 @@ class AsyncProtobufParser:
 
         return await self._try_partial_parse_async(doc_str)
 
-    async def _try_direct_parse_async(self, doc_str: str) -> Optional[Dict[str, Any]]:
+    @staticmethod
+    async def _try_direct_parse_async(doc_str: str) -> Optional[Dict[str, Any]]:
         """Async try direct JSON parsing of document."""
         try:
             obj = await anyio.to_thread.run_sync(json.loads, doc_str)
@@ -97,7 +98,8 @@ class AsyncProtobufParser:
 
         return {}
 
-    async def _balance_braces_async(self, doc_str: str) -> Optional[str]:
+    @staticmethod
+    async def _balance_braces_async(doc_str: str) -> Optional[str]:
         """Async balance JSON braces in document."""
         if '{' not in doc_str:
             return None

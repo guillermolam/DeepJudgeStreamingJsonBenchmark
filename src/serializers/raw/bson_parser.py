@@ -4,7 +4,7 @@ Note: BSON is binary format, so this implements JSON parsing
 with BSON-inspired binary-like chunking and type handling.
 """
 import json as JsonParser
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict
 import struct
 
 

@@ -1,4 +1,3 @@
-
 """
 FlatBuffers streaming parser implementation with SOLID principles.
 
@@ -234,8 +233,8 @@ class ObjectReconstructor:
                 else:
                     result += token
             else:
-                if i > 0 and not tokens[i - 1] in '{[,:':
-                    result += ' '
+                if i > 0 and tokens[i - 1] not in "{[,:":
+                    result += " "
                 result += token
 
         return result

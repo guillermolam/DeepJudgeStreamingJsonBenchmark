@@ -4,7 +4,7 @@ Note: CBOR is binary format, so this implements JSON parsing
 with CBOR-inspired compact encoding and streaming concepts.
 """
 import json
-from typing import Any, Dict, Optional, Union, List
+from typing import Any, Dict, Optional, List
 
 
 class StreamingJsonParser:

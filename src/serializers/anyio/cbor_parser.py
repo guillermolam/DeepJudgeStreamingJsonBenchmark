@@ -1,4 +1,3 @@
-
 """
 CBOR streaming parser implementation with anyio async operations.
 
@@ -10,7 +9,6 @@ import json
 import anyio
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, List
-from concurrent.futures import ThreadPoolExecutor
 
 
 @dataclass
@@ -77,7 +75,7 @@ class AsyncCborParser:
 
     @staticmethod
     async def _try_direct_parse_async(doc_str: str) -> Optional[Dict[str, Any]]:
-        """Async try direct JSON parsing of document."""
+        """Async try direct JSON parsing of a document."""
         try:
             obj = await anyio.to_thread.run_sync(json.loads, doc_str)
             return obj if isinstance(obj, dict) else None
@@ -108,33 +106,33 @@ class AsyncCborParser:
         """Sync helper to extract partial fields including nested objects."""
         result = {}
         position = 0
-        
+
         while position < len(doc_str):
-            # Find next key
+            # Find the next key
             quote_pos = doc_str.find('"', position)
             if quote_pos == -1:
                 break
-                
+
             key_start = quote_pos + 1
             key_end = doc_str.find('"', key_start)
             if key_end == -1:
                 break
-                
+
             key = doc_str[key_start:key_end]
-            
+
             # Find colon
             colon_pos = doc_str.find(':', key_end)
             if colon_pos == -1:
                 break
-                
+
             # Skip whitespace after colon
             value_start = colon_pos + 1
             while value_start < len(doc_str) and doc_str[value_start].isspace():
                 value_start += 1
-                
+
             if value_start >= len(doc_str):
                 break
-                
+
             # Extract value (including partial strings and nested objects)
             if doc_str[value_start] == '"':
                 # String value (possibly partial)
@@ -174,7 +172,7 @@ class AsyncCborParser:
             else:
                 # Non-string, non-object value - simplified for now
                 position = len(doc_str)  # Skip to end
-                
+
         return result
 
     @staticmethod
@@ -182,26 +180,26 @@ class AsyncCborParser:
         """Find the matching closing brace for an opening brace."""
         if start_pos >= len(text) or text[start_pos] != '{':
             return -1
-            
+
         brace_count = 0
         in_string = False
         escape_next = False
-        
+
         for i in range(start_pos, len(text)):
             char = text[i]
-            
+
             if escape_next:
                 escape_next = False
                 continue
-                
+
             if char == '\\':
                 escape_next = True
                 continue
-                
+
             if char == '"' and not escape_next:
                 in_string = not in_string
                 continue
-                
+
             if not in_string:
                 if char == '{':
                     brace_count += 1
@@ -209,12 +207,13 @@ class AsyncCborParser:
                     brace_count -= 1
                     if brace_count == 0:
                         return i
-                        
+
         return -1
 
-    async def _balance_braces_async(self, doc_str: str) -> Optional[str]:
-        """Async balance JSON braces in document."""
-        if '{' not in doc_str:
+    @staticmethod
+    async def _balance_braces_async(doc_str: str) -> Optional[str]:
+        """Async balance JSON braces in a document."""
+        if "{" not in doc_str:
             return None
 
         open_braces = doc_str.count('{')

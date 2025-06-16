@@ -1,35 +1,33 @@
+# Core dependencies (tested on Python 3.12.4)
+pandas>=2.3.0            # latest pandas 2.3.0 (June 4, 2025) :contentReference[oaicite:3]{index=3}
+numpy>=1.25.0            # NumPy 1.25.x series (latest for Py3.12) :contentReference[oaicite:4]{index=4}
+ujson>=5.10.0            # ultra-fast JSON encoder/decoder
+pymongo>=4.13.2          # MongoDB driver
+cbor2>=5.6.5             # CBOR serializer
+msgpack>=1.1.1           # MessagePack serializer
+protobuf>=6.31.1         # Google protocol buffers
+flatbuffers>=25.2.10     # FlatBuffers serialization
+pyarrow>=20.0.0          # Apache Arrow
+reactivex>=4.0.4         # ReactiveX for Python
+psutil>=5.9.0            # system & process utilities
+matplotlib>=3.10.3       # plotting library
+seaborn>=0.13.2          # statistical data visualization
+tqdm>=4.67.1             # progress bars
+colorama>=0.4.6          # cross-platform colored terminal text
+tabulate>=0.9.0          # pretty-print tables :contentReference[oaicite:5]{index=5}
+click>=8.2.1             # command-line utilities
+trio>=0.30.0             # async I/O library
+anyio>=4.9.0             # async compatibility layer :contentReference[oaicite:6]{index=6}
 
-# Core dependencies for streaming JSON benchmark suite
-pandas>=1.5.0
-numpy>=1.21.0
-ujson>=5.0.0
-pymongo>=4.0.0
-cbor2>=5.4.0
-msgpack>=1.0.0
-protobuf>=4.0.0
-flatbuffers>=2.0.0
-pyarrow>=10.0.0
-reactivex>=4.0.4
-psutil>=5.8.0
-matplotlib>=3.5.0
-seaborn>=0.11.0
-tqdm>=4.60.0
-colorama>=0.4.4
-tabulate>=0.9.0
-
-# Development dependencies (optional)
-# Uncomment for development environment
-pytest>=7.0.0
-pytest-cov>=4.0.0
-pytest-benchmark>=4.0.0
-black>=22.0.0
-flake8>=5.0.0
-mypy>=1.0.0
-isort>=5.10.0
-pre-commit>=2.20.0
-
-click~=8.2.1
-trio~=0.30.0
-anyio~=4.9.0
-
-triotp~=0.3.1
+# ──────────────────────────
+# Development & CI tools
+# (install via: pip install -r requirements-dev.txt)
+pytest>=8.4.0             # testing framework
+pytest-cov>=4.2.1         # coverage plugin
+pytest-benchmark>=5.1.0   # benchmarking plugin
+black>=25.1.0             # code formatter
+flake8>=7.2.0             # linter
+mypy>=1.16.1              # static type checker
+isort>=6.0.1              # import sorting
+pre-commit>=4.2.0         # git hooks manager
+pydoc-markdown>=4.8.2     # auto-generate Markdown docs

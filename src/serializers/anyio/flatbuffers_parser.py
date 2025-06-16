@@ -1,4 +1,3 @@
-
 """
 FlatBuffers streaming parser implementation with anyio async operations.
 
@@ -194,7 +193,7 @@ class StreamingJsonParser:
 
     def get(self) -> Dict[str, Any]:
         """Return current parsed state as a Python object."""
-        return anyio.run(self._get_async)
+        return anyio.run(lambda: self._get_async())
 
     async def _consume_async(self, buffer: str) -> None:
         """Async process a chunk of JSON data incrementally."""

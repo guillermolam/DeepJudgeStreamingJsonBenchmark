@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:    # ← supports `act` and manual runs
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Install Python via uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Fallback: Install uv if missing"
+        run: |
+          if ! command -v uv >/dev/null; then
+            python -m pip install --upgrade pip
+            python -m pip install uv
+          fi
+
+      - name: "Cache venv"
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+
+      - name: Initialize virtual environment
+        run: uv venv
+
+      - name: "Install dependencies"
+        run: uv pip install -r requirements.txt
+
+      - name: "Install dev & CI tools"
+        run: uv pip install pytest pytest-cov pytest-benchmark black flake8 isort pydoc-markdown
+
+      - name: "Test & Benchmark"
+        run: uv run pytest --maxfail=1 --disable-warnings --benchmark-only
+
+      - name: "Lint & Format"
+        run: |
+          uv run black --check .
+          uv run isort --check-only .
+          uv run flake8 .
+
+      - name: "Generate README.md"
+        run: |
+          # Remove old docs block
+          sed -i '/<!-- API-DOCS:START -->/,$d' README.md
+          # Append new API docs
+          uv run pydoc-markdown -p src --render-toc >> README.md
+          echo "`n## Project Structure" >> README.md
+          tree -F -a >> README.md
+
+      - name: "Upload README.md"
+        uses: actions/upload-artifact@v3
+        with:
+          name: README.md
+          path: README.md

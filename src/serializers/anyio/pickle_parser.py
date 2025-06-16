@@ -133,7 +133,7 @@ class AsyncPickleProcessor:
 
     async def _extract_documents_async(self, text: str) -> List[str]:
         """Async extract JSON documents from text."""
-        return await anyio.ru.to_thread.run_sync(self._extract_documents_sync, text)
+        return await anyio.to_thread.run_sync(self._extract_documents_sync, text)
 
     @staticmethod
     def _extract_documents_sync(text: str) -> List[str]:
