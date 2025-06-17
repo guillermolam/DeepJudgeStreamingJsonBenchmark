@@ -166,3 +166,9 @@ if __name__ == "__main__":
             assert result["outer"].get("inner") == "val"
 
     pytest.main([__file__])
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)

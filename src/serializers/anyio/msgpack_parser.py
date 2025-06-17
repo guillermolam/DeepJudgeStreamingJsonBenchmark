@@ -217,3 +217,9 @@ class StreamingJsonParser:
     async def _get_async(self) -> Dict[str, Any]:
         """Async return current parsed state as a Python object."""
         return {k: self._state.parsed_data[k] for k in sorted(self._state.parsed_data.keys())}
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)

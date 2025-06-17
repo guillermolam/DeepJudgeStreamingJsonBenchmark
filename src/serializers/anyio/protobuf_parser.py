@@ -492,3 +492,9 @@ if __name__ == '__main__':
     test_chunked_streaming_json_parser()
     test_partial_streaming_json_parser()
     print("Refactored StreamingJsonParser tests passed successfully!")
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)
