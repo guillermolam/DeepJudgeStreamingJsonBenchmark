@@ -95,14 +95,13 @@ A: Empty input, large input, invalid types...
 
 def generate_step_by_step(file_path: Path) -> str:
     return """
-## Step-by-Step Execution
-
-1. Load and parse the input file.
-2. Construct AST and tokenize.
-3. Identify main structures (classes/functions).
-4. Extract control flow and generate diagrams.
-5. Write detailed markdown with explanation.
-"""
+            ## Step-by-Step Execution
+            1. Load and parse the input file.
+            2. Construct AST and tokenize.
+            3. Identify main structures (classes/functions).
+            4. Extract control flow and generate diagrams.
+            5. Write detailed markdown with explanation.
+            """
 
 
 def generate_markdown(file_path: Path, output_dir: Path):
