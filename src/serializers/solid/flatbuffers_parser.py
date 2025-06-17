@@ -290,3 +290,9 @@ class StreamingJsonParser:
         except ValueError:
             # malformed number → return raw string
             return tok, end_pos, True
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)

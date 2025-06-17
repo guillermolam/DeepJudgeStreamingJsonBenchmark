@@ -184,3 +184,9 @@ class StreamingJsonParser:
                 return tok, i, True
 
         return None, idx, False
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)

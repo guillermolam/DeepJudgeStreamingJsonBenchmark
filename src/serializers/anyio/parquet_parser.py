@@ -29,3 +29,9 @@ class StreamingJsonParser(AnyioWrapper):
 
     def get_columnar_data(self) -> Dict[str, Any]:
         return self._parser.get_columnar_data()
+
+
+def check_solution(tests=None):
+    from .. import run_module_tests
+    import sys
+    return run_module_tests(sys.modules[__name__], tests)
