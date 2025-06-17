@@ -84,5 +84,19 @@ tasks:
       - cmd: pwsh -NoProfile -Command "act -j build-and-test --env RUST_LOG=info"
 
 
+  ci-docs:
+    desc: Generate documentation locally
+    platforms: [ windows ]
+    deps: [ setup:deps ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "uv run generate_markdown_docs.py src/serializers/ -o docs/serializers/"
+      - cmd: pwsh -NoProfile -Command "Write-Host '✔ Documentation generated in docs/serializers/'"
 
 
+  run-benchmark:
+    desc: Run benchmark using main.py with uv run
+    platforms: [ windows ]
+    deps: [ setup:deps ]
+    cmds:
+      - cmd: pwsh -NoProfile -Command "uv run python main.py"
+      - cmd: pwsh -NoProfile -Command "Write-Host '✔ Benchmark completed using main.py'"

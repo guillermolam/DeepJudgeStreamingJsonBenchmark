@@ -1,0 +1,29 @@
+# .github/workflows/llmdocgen-docs.yml
+name: LLMDOCGEN Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: python-version: '3.11'
+      - run: pip install llmdocgen pydoc-markdown
+      - run: |
+          mkdir -p annotated_code docs/llmdocgen
+          llmdocgen generate --repo . --output annotated_code
+          pydoc-markdown -m annotated_code -I annotated_code -o docs/llmdocgen/api.md
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci(docs): update documentation with llmdocgen"
+          branch: ${{ github.ref_name }}
+          file_pattern: docs/llmdocgen/** annotated_code/**
+            

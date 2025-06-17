@@ -61,3 +61,11 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
+
+      - name: "Commit Documentation Changes"
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docs/*
+          git commit -m "Update documentation [ci skip]" || echo "No changes to commit"
+          git push origin main || echo "No changes to push"

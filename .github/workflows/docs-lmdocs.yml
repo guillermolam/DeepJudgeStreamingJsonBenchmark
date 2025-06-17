@@ -1,0 +1,27 @@
+# .github/workflows/lmdocs-docs.yml
+name: LMDocs Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: python-version: '3.11'
+      - run: pip install lmdocs
+      - run: |
+          mkdir -p docs/lmdocs
+          lmdocs generate . docs/lmdocs
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci(docs): update documentation with lmdocs"
+          branch: ${{ github.ref_name }}
+          file_pattern: docs/lmdocs/**

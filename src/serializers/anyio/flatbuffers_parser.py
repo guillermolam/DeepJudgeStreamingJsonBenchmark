@@ -179,6 +179,20 @@ class AsyncFlatBuffersProcessor:
         parsed_data.update(doc_data)
 
 
+def get_metadata():
+    """Returns metadata for the anyio FlatBuffers parser."""
+    return {
+        'name': 'anyio FlatBuffers Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'FlatBuffers-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'Zero-copy potential'],
+        'weaknesses': ['Complex implementation', 'Dependency on anyio'],
+        'best_use_case': 'High-performance async applications requiring FlatBuffers support.'
+    }
+
+
 class StreamingJsonParser:
     """Async streaming JSON parser with FlatBuffers-inspired processing."""
 

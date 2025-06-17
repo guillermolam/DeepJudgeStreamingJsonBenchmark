@@ -1,4 +1,3 @@
-
 """
 orjson streaming parser implementation with anyio async operations.
 
@@ -176,6 +175,20 @@ class AsyncOrjsonProcessor:
         """Process a single document asynchronously."""
         doc_data = await self._parser.parse_document(doc)
         parsed_data.update(doc_data)
+
+
+def get_metadata():
+    """Returns metadata for the anyio orjson parser."""
+    return {
+        'name': 'anyio orjson Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'orjson-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'High performance'],
+        'weaknesses': ['Complex implementation', 'Dependency on anyio'],
+        'best_use_case': 'High-performance async applications requiring orjson support.'
+    }
 
 
 class StreamingJsonParser:

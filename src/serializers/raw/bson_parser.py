@@ -100,6 +100,20 @@ class StreamingJsonParser:
         return self.result.copy()
 
 
+def get_metadata():
+    """Returns metadata for the raw BSON parser."""
+    return {
+        'name': 'raw BSON Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'BSON-style streaming parser.',
+        'strengths': ['Handles binary data efficiently'],
+        'weaknesses': ['Simplified implementation'],
+        'best_use_case': 'Applications requiring BSON support.'
+    }
+
+
 if __name__ == "__main__":
     import pytest
 

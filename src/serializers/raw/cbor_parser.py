@@ -318,6 +318,19 @@ class StreamingJsonParser:
 
         return False
 
+    def get_metadata():
+        """Returns metadata for the raw CBOR parser."""
+        return {
+            'name': 'raw CBOR Parser',
+            'time_complexity': 'O(n)',
+            'space_complexity': 'O(n)',
+            'overall_complexity': 'O(n) time, O(n) space',
+            'description': 'CBOR-style streaming parser.',
+            'strengths': ['Compact binary format'],
+            'weaknesses': ['Complex implementation'],
+            'best_use_case': 'Applications requiring CBOR support.'
+        }
+
     def get(self) -> Dict[str, Any]:
         """
         Return current parsed state as Python object.

@@ -5,142 +5,41 @@ Algorithm Metadata for Streaming JSON Parser Benchmarks
 Contains complexity analysis and metadata for each parser implementation.
 """
 
-from typing import Dict, Any
+import importlib
+from typing import Dict, Any, Optional
 
-ALGORITHM_METADATA: Dict[str, Dict[str, Any]] = {
+from .parser_loader import LOADED_PARSERS
 
-    'json_parser': {
-        'name': 'Standard JSON Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space',
-        'description': 'Standard Python json module with streaming buffer',
-        'strengths': ['Simple implementation', 'Reliable', 'Built-in'],
-        'weaknesses': ['Not optimized for streaming', 'Memory overhead'],
-        'best_use_case': 'General purpose JSON parsing'
-    },
 
-    'ultrajson_parser': {
-        'name': 'UltraJSON Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - optimized C implementation',
-        'description': 'Ultra-fast JSON encoder/decoder with C extensions',
-        'strengths': ['Very fast', 'C implementation', 'Drop-in replacement'],
-        'weaknesses': ['External dependency', 'Less flexible'],
-        'best_use_case': 'High-performance JSON processing'
-    },
+class MetadataCollector:
+    """Dynamically collects and manages algorithm metadata."""
 
-    'msgpack_parser': {
-        'name': 'MessagePack Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - binary format efficiency',
-        'description': 'Binary serialization format, more compact than JSON',
-        'strengths': ['Compact binary format', 'Fast', 'Cross-language'],
-        'weaknesses': ['Not human-readable', 'Format conversion overhead'],
-        'best_use_case': 'Network protocols, data_gen storage'
-    },
+    def __init__(self):
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+        self._load_metadata()
 
-    'pickle_binary_mono_parser': {
-        'name': 'Pickle Binary (Single-threaded)',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - Python object serialization',
-        'description': 'Python pickle protocol for object serialization',
-        'strengths': ['Native Python objects', 'Preserves types'],
-        'weaknesses': ['Python-specific', 'Security concerns', 'Larger size'],
-        'best_use_case': 'Python-to-Python communication'
-    },
+    def _load_metadata(self) -> None:
+        """Load metadata from all available parser modules."""
+        for parser_name, parser_class in LOADED_PARSERS.items():
+            try:
+                module = importlib.import_module(parser_class.__module__)
+                if hasattr(module, "get_metadata"):
+                    self._metadata[parser_name] = module.get_metadata()
+            except (ImportError, AttributeError) as e:
+                print(f"Could not load metadata for {parser_name}: {e}")
 
-    'pickle_binary_multi_parser': {
-        'name': 'Pickle Binary (Multi-threaded)',
-        'time_complexity': 'O(n/p)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n/p) time, O(n) space where p = processors',
-        'description': 'Multi-threaded pickle with parallel processing',
-        'strengths': ['Parallel processing', 'Better CPU utilization'],
-        'weaknesses': ['Threading overhead', 'Complex synchronization'],
-        'best_use_case': 'Large datasets with multiple CPU cores'
-    },
+    def get_all_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Get all collected metadata."""
+        return self._metadata
 
-    'bson_parser': {
-        'name': 'BSON Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - binary JSON with types',
-        'description': 'Binary JSON format used by MongoDB',
-        'strengths': ['Type preservation', 'Efficient for databases', 'Binary format'],
-        'weaknesses': ['Larger than JSON', 'MongoDB-specific'],
-        'best_use_case': 'Database storage and retrieval'
-    },
+    def get_metadata(self, parser_name: str) -> Optional[Dict[str, Any]]:
+        """Get metadata for a specific parser."""
+        return self._metadata.get(parser_name)
 
-    'cbor_parser': {
-        'name': 'CBOR Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - RFC 7049 binary format',
-        'description': 'Concise Binary Object Representation (RFC 7049)',
-        'strengths': ['Standardized', 'Compact', 'Self-describing'],
-        'weaknesses': ['Less common', 'Conversion overhead'],
-        'best_use_case': 'IoT devices, constrained environments'
-    },
 
-    'protobuf_parser': {
-        'name': 'Protocol Buffers Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - schema-based binary',
-        'description': 'Google Protocol Buffers with schema definition',
-        'strengths': ['Very compact', 'Schema evolution', 'Cross-language'],
-        'weaknesses': ['Requires schema', 'Complex setup'],
-        'best_use_case': 'Microservices, API communication'
-    },
-
-    'flatbuffers_parser': {
-        'name': 'FlatBuffers Parser',
-        'time_complexity': 'O(1)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(1) access time, O(n) space - zero-copy',
-        'description': 'Zero-copy serialization with direct memory access',
-        'strengths': ['Zero-copy', 'Constant access time', 'Memory efficient'],
-        'weaknesses': ['Complex schema', 'Write-once limitation'],
-        'best_use_case': 'Game engines, real-time systems'
-    },
-
-    'parquet_parser': {
-        'name': 'Apache Parquet Parser',
-        'time_complexity': 'O(n log n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n log n) time, O(n) space - columnar storage',
-        'description': 'Columnar storage format optimized for analytics',
-        'strengths': ['Excellent compression', 'Columnar efficiency', 'Analytics optimized'],
-        'weaknesses': ['Complex format', 'Not streaming-friendly', 'Overhead'],
-        'best_use_case': 'Data analytics, batch processing'
-    },
-
-    'marshall_parser': {
-        'name': 'Python Marshal Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(n)',
-        'overall_complexity': 'O(n) time, O(n) space - Python bytecode format',
-        'description': 'Python marshal module for bytecode serialization',
-        'strengths': ['Fast for Python objects', 'Compact'],
-        'weaknesses': ['Python version dependent', 'Limited compatibility'],
-        'best_use_case': 'Python bytecode, internal serialization'
-    },
-
-    'reactivex_parser': {
-        'name': 'ReactiveX Streaming Parser',
-        'time_complexity': 'O(n)',
-        'space_complexity': 'O(1)',
-        'overall_complexity': 'O(n) time, O(1) space - reactive streaming',
-        'description': 'Reactive Extensions for streaming data_gen processing',
-        'strengths': ['True streaming', 'Constant memory', 'Reactive patterns'],
-        'weaknesses': ['Complex programming model', 'Learning curve'],
-        'best_use_case': 'Real-time streaming, event processing'
-    }
-}
+# Initialize the metadata collector
+METADATA_COLLECTOR = MetadataCollector()
+ALGORITHM_METADATA = METADATA_COLLECTOR.get_all_metadata()
 
 
 def get_algorithm_info(parser_algorythm_name: str) -> Dict[str, Any]:
@@ -283,7 +182,7 @@ def generate_algorithm_report() -> str:
         key=lambda x: get_complexity_score(x[1]['time_complexity'])
     )
 
-    for parser_algo_name, algo_info in sorted_algos:
+    for _, algo_info in sorted_algos:
         report.append("Algorithm: " + algo_info['name'])
         report.append("  Time Complexity: " + algo_info['time_complexity'])
         report.append("  Space Complexity: " + algo_info['space_complexity'])
@@ -293,33 +192,3 @@ def generate_algorithm_report() -> str:
         report.append("")
 
     return "\n".join(report)
-
-
-if __name__ == "__main__":
-    """Test the algorithm metadata module."""
-
-    print("Algorithm Metadata Test")
-    print("=" * 30)
-
-    # Test getting info for each parser
-    for parser_name in ALGORITHM_METADATA.keys():
-        info = get_algorithm_info(parser_name)
-        print("\n" + parser_name + ":")
-        print("  Name: " + info['name'])
-        print("  Time: " + info['time_complexity'])
-        print("  Space: " + info['space_complexity'])
-
-    # Test comparison
-    print("\n" + "=" * 30)
-    print("Algorithm Comparison Test")
-    print("=" * 30)
-
-    comparison = compare_algorithms('flatbuffers_parser', 'json_parser')
-    print("\nComparing FlatBuffers vs JSON:")
-    print("Time winner: " + comparison['comparison']['time_winner'])
-    print("Space winner: " + comparison['comparison']['space_winner'])
-    print("Overall winner: " + comparison['comparison']['overall_winner'])
-
-    # Generate a full report
-    print("\n" + "=" * 50)
-    print(generate_algorithm_report())

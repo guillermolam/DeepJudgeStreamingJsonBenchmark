@@ -51,7 +51,7 @@ jobs:
           uv run flake8 .
 
       - name: "Run Benchmark (main.py)"
-        run: uv run python src/main.py
+        run: uv run python main.py
 
       - name: "Upload Benchmark Results"
         uses: actions/upload-artifact@v3

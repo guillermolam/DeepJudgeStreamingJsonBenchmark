@@ -292,6 +292,20 @@ class AsyncCborProcessor:
         parsed_data.update(doc_data)
 
 
+def get_metadata():
+    """Returns metadata for the anyio CBOR parser."""
+    return {
+        'name': 'anyio CBOR Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'CBOR-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'Compact binary format'],
+        'weaknesses': ['Complex implementation', 'Dependency on anyio'],
+        'best_use_case': 'High-performance async applications requiring CBOR support.'
+    }
+
+
 class StreamingJsonParser:
     """Async streaming JSON parser with CBOR-inspired processing."""
 

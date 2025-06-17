@@ -1,4 +1,3 @@
-
 """
 BSON streaming parser implementation with anyio async operations.
 
@@ -315,6 +314,20 @@ class AsyncBsonProcessor:
         """Process a single document asynchronously."""
         doc_data = await self._document_parser.parse_document(doc)
         parsed_data.update(doc_data)
+
+
+def get_metadata():
+    """Returns metadata for the anyio BSON parser."""
+    return {
+        'name': 'anyio BSON Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'BSON-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'Handles binary data efficiently'],
+        'weaknesses': ['Complex implementation', 'Dependency on anyio'],
+        'best_use_case': 'High-performance async applications requiring BSON support.'
+    }
 
 
 class StreamingJsonParser:

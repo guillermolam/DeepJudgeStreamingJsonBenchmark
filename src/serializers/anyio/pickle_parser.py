@@ -456,6 +456,20 @@ class AsyncPickleProcessor: # Original class
         doc_data = await self._parser.parse_document(doc)
         parsed_data.update(doc_data)
 
+def get_metadata():
+    """Returns metadata for the anyio Pickle parser."""
+    return {
+        'name': 'anyio Pickle Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'Pickle-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'Native Python object serialization'],
+        'weaknesses': ['Python-specific', 'Security concerns'],
+        'best_use_case': 'High-performance async applications requiring Pickle support.'
+    }
+
+
 # Mandatory tests for the refactored StreamingJsonParser
 def test_streaming_json_parser():
     parser = StreamingJsonParser()

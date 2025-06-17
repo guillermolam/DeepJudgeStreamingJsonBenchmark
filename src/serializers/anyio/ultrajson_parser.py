@@ -451,6 +451,20 @@ class AsyncUltraJsonProcessor: # Original class
         doc_data = await self._parser.parse_document(doc)
         parsed_data.update(doc_data)
 
+def get_metadata():
+    """Returns metadata for the anyio ultrajson parser."""
+    return {
+        'name': 'anyio ultrajson Parser',
+        'time_complexity': 'O(n)',
+        'space_complexity': 'O(n)',
+        'overall_complexity': 'O(n) time, O(n) space',
+        'description': 'ultrajson-style streaming parser with anyio for async operations.',
+        'strengths': ['Asynchronous', 'High performance'],
+        'weaknesses': ['Complex implementation', 'Dependency on anyio'],
+        'best_use_case': 'High-performance async applications requiring ultrajson support.'
+    }
+
+
 # Mandatory tests for the refactored StreamingJsonParser
 def test_streaming_json_parser():
     parser = StreamingJsonParser()

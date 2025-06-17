@@ -1,0 +1,27 @@
+# .github/workflows/ai-docs-docs.yml
+name: AI Docs Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: python-version: '3.11'
+      - run: pip install ai-docs
+      - run: |
+          mkdir -p docs/ai-docs
+          ai-docs scan . --output docs/ai-docs
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci(docs): update documentation with ai-docs"
+          branch: ${{ github.ref_name }}
+          file_pattern: docs/ai-docs/**

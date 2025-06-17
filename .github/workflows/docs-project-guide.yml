@@ -1,0 +1,27 @@
+# .github/workflows/project-guide-docs.yml
+name: Project Guide Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: python-version: '3.11'
+      - run: pip install project-guide
+      - run: |
+          mkdir -p docs/project-guide
+          project-guide generate . docs/project-guide
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci(docs): update documentation with Project Guide"
+          branch: ${{ github.ref_name }}
+          file_pattern: docs/project-guide/**
