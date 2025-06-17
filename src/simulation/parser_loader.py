@@ -9,7 +9,7 @@ LOADED_PARSERS: Dict[str, Type] = {}
 FAILED_PARSERS: Dict[str, str] = {}
 
 
-def discover_parsers(base_package: str = "src.serializers") -> None:
+def discover_parsers(base_package: str = "serializers") -> None:
     """Discovers and loads all parsers from the specified base package."""
     global LOADED_PARSERS, FAILED_PARSERS
     LOADED_PARSERS.clear()

@@ -1,640 +1,275 @@
+# src/serializers/raw/parquet_parser.py
+
 """
-Parquet streaming parser implementation with SOLID principles.
+src/serializers/raw/parquet_parser.py
 
-This module *previously* implemented a streaming JSON parser inspired by Parquet columnar storage format.
-The StreamingJsonParser class below has been refactored to be a direct, byte-based
-streaming JSON parser adhering to the project-wide specification.
-The original Parquet-inspired helper classes remain but are no longer used by StreamingJsonParser.
+Streaming JSON parser using a columnar-storage model inspired by Apache Parquet.
+
+This parser:
+  - Buffers incoming JSON text chunks (complete or partial).
+  - Incrementally parses the buffer into individual columns (one per top-level key).
+  - Maintains metadata (per-column counts and observed types).
+  - Reconstructs the current JSON object on get() by assembling columns.
+
+The columnar approach lets you inspect or extend per-field analytics (counts, types)
+independently of the full-object view.
 """
-import json
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, List, Union
 
-# --- Start of Refactored StreamingJsonParser and its dependencies ---
-# (Identical to the implementation in raw/ultrajson_parser.py for consistency and compliance)
+from typing import Any, Dict, Tuple
 
-# State constants for the parser
-_ST_EXPECT_OBJ_START = 0
-_ST_EXPECT_KEY_START = 1  # After '{' or ','
-_ST_IN_KEY = 2
-_ST_IN_KEY_ESCAPE = 3
-_ST_EXPECT_COLON = 4
-_ST_EXPECT_VALUE_START = 5
-_ST_IN_STRING_VALUE = 6
-_ST_IN_STRING_VALUE_ESCAPE = 7
-_ST_IN_NUMBER = 8
-_ST_IN_TRUE = 9
-_ST_IN_FALSE = 10
-_ST_IN_NULL = 11
-_ST_EXPECT_COMMA_OR_OBJ_END = 12
-_ST_OBJ_END = 13
-_ST_ERROR = 99
-
-_WHITESPACE = b" \t\n\r"
-_DIGITS = b"0123456789"
-_NUMBER_CHARS = _DIGITS + b"-.eE+"
 
 class StreamingJsonParser:
-    """
-    A streaming JSON parser that processes byte-based input incrementally.
-    It can handle partial JSON objects and incomplete string values,
-    returning the currently parsed data structure at any point.
-    This version replaces the original Parquet-style parser in this module.
-    """
-
     def __init__(self):
-        """Initializes the streaming JSON parser."""
-        self._buffer = bytearray()
-        self._result: Dict[str, Any] = {}
-        self._state = _ST_EXPECT_OBJ_START
-
-        self._current_key_bytes = bytearray()
-        self._current_value_bytes = bytearray()
-
-        self._active_key: Optional[str] = None
-        self._idx = 0
-
-    def consume(self, chunk: str) -> None: # Changed to accept str
         """
-        Appends a chunk of JSON string to the internal buffer and processes it
-        after converting to bytes.
+        Initialize an empty buffer, an empty column store, and empty metadata.
+        """
+        self._buffer: str = ""
+        # Columnar store: key → latest value
+        self._columns: Dict[str, Any] = {}
+        # Metadata per column: key → {'count': int, 'type': str}
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+
+    def consume(self, chunk: str) -> None:
+        """
+        Consume the next chunk of JSON text (complete or partial).
 
         Args:
-            chunk: A string containing a part of the JSON document.
+            chunk: str containing JSON fragment(s).
         """
         if not isinstance(chunk, str):
-            return
-
-        byte_chunk = chunk.encode('utf-8', errors='replace')
-        self._buffer.extend(byte_chunk)
-        self._process_buffer()
+            raise TypeError(f"Expected str, got {type(chunk)}")
+        self._buffer += chunk
 
     def get(self) -> Dict[str, Any]:
         """
-        Returns the current state of the parsed JSON object.
-        This includes any fully parsed key-value pairs and partially
-        completed string values if a key has been fully parsed.
-        Incomplete keys are not included.
+        Return the current JSON object state as a dict.
+
+        This re-parses the entire buffer, then updates the columnar store
+        and metadata for any keys seen, and finally returns the assembled object.
+        """
+        obj, _, _ = self._parse_obj(self._buffer, 0)
+
+        self._update_columnar_metadata(obj)
+        return self._assemble_object_from_columns(obj)
+
+    def _update_columnar_metadata(self, obj: Dict[str, Any]) -> None:
+        """Update columnar store and metadata for parsed object."""
+        for key, val in obj.items():
+            self._columns[key] = val
+            self._update_column_metadata(key, val)
+
+    def _update_column_metadata(self, key: str, val: Any) -> None:
+        """Update metadata for a specific column."""
+        metadata = self._metadata.setdefault(key, {"count": 0, "type": None})
+        metadata["count"] += 1
+        metadata["type"] = type(val).__name__
+
+    def _assemble_object_from_columns(self, obj: Dict[str, Any]) -> Dict[str, Any]:
+        """Assemble the object from columns ensuring consistent ordering."""
+        return {k: self._columns[k] for k in obj.keys()}
+
+    # ─── Internal Parsing Helpers ─────────────────────────────────────────────
+
+    def _parse_obj(self, s: str, i: int) -> Tuple[Dict[str, Any], int, bool]:
+        """
+        Parse a JSON object starting at s[i] == '{'.
 
         Returns:
-            A dictionary representing the currently parsed JSON object.
+            (parsed_dict, new_index, is_complete)
         """
-        output_dict = self._result.copy()
+        if not self._is_valid_object_start(s, i):
+            return {}, i, False
 
-        if self._active_key is not None and self._state == _ST_IN_STRING_VALUE:
-            if self._current_value_bytes:
-                try:
-                    partial_value_str = self._current_value_bytes.decode('utf-8', errors='replace')
-                    output_dict[self._active_key] = partial_value_str
-                except Exception:
-                    pass
-        return output_dict
+        i += 1  # Skip opening brace
+        result: Dict[str, Any] = {}
+        i = self._skip_whitespace(s, i, len(s))
 
-    def _handle_escape_char(self, byte_val: int) -> int:
-        """Handles JSON escape sequences."""
-        if byte_val == b'"'[0]:
-            return b'"'[0]
-        if byte_val == b'\\'[0]:
-            return b'\\'[0]
-        if byte_val == b'/'[0]:
-            return b'/'[0]
-        if byte_val == b'b'[0]:
-            return b'\b'[0]
-        if byte_val == b'f'[0]:
-            return b'\f'[0]
-        if byte_val == b'n'[0]:
-            return b'\n'[0]
-        if byte_val == b'r'[0]:
-            return b'\r'[0]
-        if byte_val == b't'[0]:
-            return b'\t'[0]
-        return byte_val
+        return self._parse_object_content(s, i, result)
 
-    def _finalize_value(self, value: Any):
-        """Helper to assign a parsed value to the active key and reset."""
-        if self._active_key is not None:
-            self._result[self._active_key] = value
-        self._active_key = None
-        self._current_value_bytes.clear()
-        self._state = _ST_EXPECT_COMMA_OR_OBJ_END
+    def _is_valid_object_start(self, s: str, i: int) -> bool:
+        """Check if position i contains a valid object start."""
+        return i < len(s) and s[i] == "{"
 
-    def _parse_and_finalize_number(self):
-        """Parses the number in _current_value_bytes and finalizes it."""
-        if not self._current_value_bytes:
-            self._state = _ST_ERROR
-            return False
+    def _parse_object_content(self, s: str, i: int, result: Dict[str, Any]) -> Tuple[Dict[str, Any], int, bool]:
+        """Parse the content inside JSON object braces."""
+        n = len(s)
 
-        num_str = self._current_value_bytes.decode('utf-8')
+        while i < n:
+            if self._is_object_end(s, i):
+                return result, i + 1, True
 
-        if num_str == "-" or num_str == "+" or num_str.endswith(('.', 'e', 'E', '+', '-')):
-            self._state = _ST_ERROR
-            return False
+            if not self._is_valid_key_start(s, i):
+                break
 
-        try:
-            if any(c in num_str for c in ('.', 'e', 'E')):
-                parsed_num = float(num_str)
+            i = self._process_key_value_pair(s, i, n, result)
+            if i == -1:  # Error occurred
+                break
+
+        return result, i, False
+
+    def _is_object_end(self, s: str, i: int) -> bool:
+        """Check if current position marks object end."""
+        return s[i] == "}"
+
+    def _is_valid_key_start(self, s: str, i: int) -> bool:
+        """Check if current position is a valid key start."""
+        return s[i] == '"'
+
+    def _process_key_value_pair(self, s: str, i: int, n: int, result: Dict[str, Any]) -> int:
+        """Process a single key-value pair and return new index or -1 on error."""
+        key, value, new_i, should_break = self._parse_key_value_pair(s, i, n)
+
+        if should_break:
+            return -1
+
+        if key is not None:
+            result[key] = value
+
+        return self._handle_comma_and_whitespace(s, new_i, n)
+
+    def _skip_whitespace(self, s: str, i: int, n: int) -> int:
+        """Skip whitespace characters and return new index."""
+        while i < n and s[i].isspace():
+            i += 1
+        return i
+
+    def _parse_key_value_pair(self, s: str, i: int, n: int) -> Tuple[Any, Any, int, bool]:
+        """Parse a key-value pair and return (key, value, new_index, should_break)."""
+        # Parse key
+        key, i, key_complete = self._parse_key(s, i)
+        if not key_complete:
+            return None, None, i, True
+
+        # Parse colon separator
+        i, colon_found = self._parse_colon_separator(s, i, n)
+        if not colon_found:
+            return None, None, i, True
+
+        # Parse value
+        return self._parse_value_for_key(s, i, n, key)
+
+    def _parse_key(self, s: str, i: int) -> Tuple[str, int, bool]:
+        """Parse a JSON key and return (key, new_index, is_complete)."""
+        return self._parse_str(s, i)
+
+    def _parse_colon_separator(self, s: str, i: int, n: int) -> Tuple[int, bool]:
+        """Parse the colon separator and return (new_index, found)."""
+        i = self._skip_whitespace(s, i, n)
+        if i >= n or s[i] != ":":
+            return i, False
+
+        i += 1
+        i = self._skip_whitespace(s, i, n)
+        return i, True
+
+    def _parse_value_for_key(self, s: str, i: int, n: int, key: str) -> Tuple[Any, Any, int, bool]:
+        """Parse value for a given key."""
+        if i >= n:
+            return key, None, i, True
+
+        val, i, done = self._parse_val(s, i)
+
+        if self._should_include_value(val, done):
+            return key, val, i, False
+        return None, None, i, False
+
+    def _should_include_value(self, val: Any, done: bool) -> bool:
+        """Check if value should be included based on columnar rules."""
+        return isinstance(val, str) or isinstance(val, dict) or done
+
+    def _handle_comma_and_whitespace(self, s: str, i: int, n: int) -> int:
+        """Handle comma and whitespace after a key-value pair."""
+        i = self._skip_whitespace(s, i, n)
+        if i < n and s[i] == ",":
+            i += 1
+            i = self._skip_whitespace(s, i, n)
+        return i
+
+    def _parse_str(self, s: str, i: int) -> Tuple[str, int, bool]:
+        """
+        Parse a JSON string starting at s[i] == '"'.
+
+        Returns:
+            (content, new_index, is_closed)
+        """
+        i += 1
+        n = len(s)
+        out: list[str] = []
+        escape = False
+
+        while i < n:
+            c = s[i]
+            if escape:
+                out.append(c)
+                escape = False
+            elif c == "\\":
+                escape = True
+            elif c == '"':
+                return "".join(out), i + 1, True
             else:
-                parsed_num = int(num_str)
-            self._finalize_value(parsed_num)
-            return True
-        except ValueError:
-            self._state = _ST_ERROR
-            return False
+                out.append(c)
+            i += 1
 
-    def _process_buffer(self):
-        """Processes the internal buffer to parse JSON content using a state machine."""
-        buffer_len = len(self._buffer)
-        while self._idx < buffer_len:
-            byte = self._buffer[self._idx]
+        # incomplete string
+        return "".join(out), n, False
 
-            if self._state == _ST_EXPECT_OBJ_START:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                if byte == b'{'[0]:
-                    self._state = _ST_EXPECT_KEY_START
-                    self._idx += 1
-                else:
-                    self._state = _ST_ERROR
-                    return
+    def _parse_val(self, s: str, i: int) -> Tuple[Any, int, bool]:
+        """
+        Parse a JSON value at s[i]: string, object, number, boolean, or null.
 
-            elif self._state == _ST_EXPECT_KEY_START:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                if byte == b'"'[0]:
-                    self._state = _ST_IN_KEY
-                    self._current_key_bytes.clear()
-                    self._active_key = None
-                    self._idx += 1
-                elif byte == b'}'[0]:
-                    self._state = _ST_OBJ_END
-                    self._idx += 1
-                else:
-                    self._state = _ST_ERROR
-                    return
+        Returns:
+            (value, new_index, is_complete)
+        """
+        n = len(s)
+        if i >= n:
+            return None, i, False
 
-            elif self._state == _ST_IN_KEY:
-                if byte == b'\\'[0]:
-                    self._state = _ST_IN_KEY_ESCAPE
-                    self._idx += 1
-                elif byte == b'"'[0]:
-                    try:
-                        self._active_key = self._current_key_bytes.decode('utf-8')
-                        self._state = _ST_EXPECT_COLON
-                    except UnicodeDecodeError:
-                        self._active_key = None
-                        self._state = _ST_ERROR
-                        return
-                    self._idx += 1
-                else:
-                    self._current_key_bytes.append(byte)
-                    self._idx += 1
+        c = s[i]
 
-            elif self._state == _ST_IN_KEY_ESCAPE:
-                self._current_key_bytes.append(self._handle_escape_char(byte))
-                self._state = _ST_IN_KEY
-                self._idx += 1
+        # Handle different value types
+        if c == '"':
+            return self._parse_str(s, i)
+        if c == "{":
+            return self._parse_obj(s, i)
 
-            elif self._state == _ST_EXPECT_COLON:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                if byte == b':'[0]:
-                    self._state = _ST_EXPECT_VALUE_START
-                    self._idx += 1
-                else:
-                    self._state = _ST_ERROR
-                    return
+        # Try literals first
+        literal_result = self._try_parse_literals(s, i)
+        if literal_result:
+            return literal_result
 
-            elif self._state == _ST_EXPECT_VALUE_START:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                self._current_value_bytes.clear()
-                if byte == b'"'[0]:
-                    self._state = _ST_IN_STRING_VALUE
-                    self._idx += 1
-                elif byte == b't'[0]:
-                    self._state = _ST_IN_TRUE
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
-                elif byte == b'f'[0]:
-                    self._state = _ST_IN_FALSE
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
-                elif byte == b'n'[0]:
-                    self._state = _ST_IN_NULL
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
-                elif byte in _NUMBER_CHARS and (byte != b'+'[0]):
-                    self._state = _ST_IN_NUMBER
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
-                else:
-                    self._state = _ST_ERROR
-                    return
+        # Try number parsing
+        number_result = self._try_parse_number(s, i, n)
+        if number_result:
+            return number_result
 
-            elif self._state == _ST_IN_STRING_VALUE:
-                if byte == b'\\'[0]:
-                    self._state = _ST_IN_STRING_VALUE_ESCAPE
-                    self._idx += 1
-                elif byte == b'"'[0]:
-                    if self._active_key is not None:
-                        try:
-                            value_str = self._current_value_bytes.decode('utf-8')
-                            self._finalize_value(value_str)
-                        except UnicodeDecodeError:
-                            value_str = self._current_value_bytes.decode('utf-8', errors='replace')
-                            self._finalize_value(value_str)
-                    else:
-                        self._state = _ST_ERROR
-                        return
-                    self._idx += 1
-                else:
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
+        # Nothing matched
+        return None, i, False
 
-            elif self._state == _ST_IN_STRING_VALUE_ESCAPE:
-                self._current_value_bytes.append(self._handle_escape_char(byte))
-                self._state = _ST_IN_STRING_VALUE
-                self._idx += 1
-
-            elif self._state == _ST_IN_TRUE:
-                self._current_value_bytes.append(byte)
-                self._idx += 1
-                if self._current_value_bytes == b"true":
-                    self._finalize_value(True)
-                elif not b"true".startswith(self._current_value_bytes):
-                    self._state = _ST_ERROR
-                    return
-
-            elif self._state == _ST_IN_FALSE:
-                self._current_value_bytes.append(byte)
-                self._idx += 1
-                if self._current_value_bytes == b"false":
-                    self._finalize_value(False)
-                elif not b"false".startswith(self._current_value_bytes):
-                    self._state = _ST_ERROR
-                    return
-
-            elif self._state == _ST_IN_NULL:
-                self._current_value_bytes.append(byte)
-                self._idx += 1
-                if self._current_value_bytes == b"null":
-                    self._finalize_value(None)
-                elif not b"null".startswith(self._current_value_bytes):
-                    self._state = _ST_ERROR
-                    return
-
-            elif self._state == _ST_IN_NUMBER:
-                if byte in _NUMBER_CHARS:
-                    self._current_value_bytes.append(byte)
-                    self._idx += 1
-                else:
-                    if not self._parse_and_finalize_number():
-                        return
-
-            elif self._state == _ST_EXPECT_COMMA_OR_OBJ_END:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                if byte == b','[0]:
-                    self._state = _ST_EXPECT_KEY_START
-                    self._idx += 1
-                elif byte == b'}'[0]:
-                    self._state = _ST_OBJ_END
-                    self._idx += 1
-                else:
-                    self._state = _ST_ERROR
-                    return
-
-            elif self._state == _ST_OBJ_END:
-                if byte in _WHITESPACE:
-                    self._idx += 1
-                    continue
-                self._state = _ST_ERROR
-                return
-
-            elif self._state == _ST_ERROR:
-                return
-
-            else:
-                self._state = _ST_ERROR
-                return
-
-        if self._idx > 0:
-            self._buffer = self._buffer[self._idx:]
-            self._idx = 0
-
-# --- End of Refactored StreamingJsonParser ---
-
-# --- Original Parquet-inspired helper classes (now unused by StreamingJsonParser) ---
-@dataclass
-class ParserState: # Original class
-    """Immutable state container for the Parquet parser."""
-    buffer: str = ""
-    parsed_data: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ParsedMessage:
-    """Immutable data structure for parsed messages."""
-    content: str
-    is_complete: bool
-    brace_count: int
-
-
-class MessageValidator:
-    """Stateless validator for Parquet-style messages."""
-
-    @staticmethod
-    def is_valid_key(key: str) -> bool:
-        """Validate if a key is valid for columnar storage."""
-        return isinstance(key, str) and len(key) > 0
-
-    @staticmethod
-    def is_valid_value(value: Any) -> bool:
-        """Check if the value is valid for columnar storage."""
-        if value is None or isinstance(value, (str, int, float, bool)):
-            return True
-        if isinstance(value, list):
-            return all(MessageValidator.is_valid_value(item) for item in value)
-        if isinstance(value, dict):
-            return all(
-                isinstance(k, str) and MessageValidator.is_valid_value(v)
-                for k, v in value.items()
-            )
-        return False
-
-
-class PairExtractor: # Original class
-    """Extracts complete key-value pairs from objects using stateless operations."""
-
-    @staticmethod
-    def extract_complete_pairs(obj: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract complete key-value pairs with columnar validation."""
-        if not isinstance(obj, dict):
-            return {}
-        return {
-            key: value
-            for key, value in obj.items()
-            if MessageValidator.is_valid_key(key) and MessageValidator.is_valid_value(value)
-        }
-
-
-class ValueParser:
-    """Stateless utility for parsing values in columnar format."""
-
-    @staticmethod
-    def parse_value(value_str: str) -> Any:
-        """Parse string value to the appropriate Python type."""
-        if not value_str:
-            return None
-        cleaned_value = value_str.rstrip(',}').strip()
-        if ValueParser._is_quoted_string(cleaned_value):
-            return cleaned_value[1:-1]
-        if cleaned_value.lower() == 'true':
-            return True
-        if cleaned_value.lower() == 'false':
-            return False
-        if cleaned_value.lower() == 'null':
-            return None
-        parsed_number = ValueParser._try_parse_number(cleaned_value)
-        if parsed_number is not None:
-            return parsed_number
-        return cleaned_value
-
-    @staticmethod
-    def _is_quoted_string(value: str) -> bool:
-        """Check if the value is a quoted string."""
-        return len(value) >= 2 and value.startswith('"') and value.endswith('"')
-
-    @staticmethod
-    def _try_parse_number(value: str) -> Optional[Union[int, float]]:
-        """Try to parse value as number."""
-        try:
-            if '.' in value:
-                return float(value)
-            return int(value)
-        except ValueError:
-            return None
-
-
-class MessageExtractor:
-    """Stateless utility for extracting complete JSON messages."""
-
-    @staticmethod
-    def extract_messages(text: str) -> List[ParsedMessage]:
-        """Extract complete JSON messages from text data."""
-        if not text:
-            return []
-        extractor = MessageExtractionState()
-        for ch in text:
-            extractor.process_character(ch)
-        extractor.finalize()
-        return extractor.get_messages()
-
-    @staticmethod
-    def _update_braces(ch: str, count: int) -> int:
-        """Update brace count based on character."""
-        if ch == '{':
-            return count + 1
-        if ch == '}':
-            return count - 1
-        return count
-
-
-class MessageExtractionState:
-    """Handles message extraction state for MessageExtractor."""
-    def __init__(self):
-        self.messages: List[ParsedMessage] = []
-        self.current_chars: List[str] = []
-        self.brace_count: int = 0
-        self.in_string: bool = False
-        self.escape_next: bool = False
-
-    def process_character(self, ch: str) -> None:
-        """Process a single character."""
-        self.current_chars.append(ch)
-        if self.escape_next:
-            self.escape_next = False
-            return
-        if ch == '\\':
-            self.escape_next = True
-            return
-        if self._is_string_delimiter(ch):
-            return
-        if self.in_string:
-            return
-        self._handle_brace_character(ch)
-
-    def _is_string_delimiter(self, ch: str) -> bool:
-        """Handle string delimiter character."""
-        if ch == '"' and not self.escape_next:
-            self.in_string = not self.in_string
-            return True
-        return False
-
-    def _handle_brace_character(self, ch: str) -> None:
-        """Handle brace characters for message parsing."""
-        self.brace_count = MessageExtractor._update_braces(ch, self.brace_count)
-        if self.brace_count == 0 and len(self.current_chars) > 1:
-            self._complete_message()
-
-    def _complete_message(self) -> None:
-        """Complete the current message."""
-        content = ''.join(self.current_chars).strip()
-        if content:
-            self.messages.append(ParsedMessage(content=content, is_complete=True, brace_count=0))
-        self.current_chars.clear()
-
-    def finalize(self) -> None:
-        """Finalize extraction and handle remaining incomplete message."""
-        if self.current_chars:
-            content = ''.join(self.current_chars).strip()
-            if content:
-                self.messages.append(ParsedMessage(
-                    content=content, is_complete=self.brace_count == 0, brace_count=self.brace_count
-                ))
-
-    def get_messages(self) -> List[ParsedMessage]:
-        """Get the list of extracted messages."""
-        return self.messages
-
-
-class MessageFormatter:
-    """Stateless utility for message formatting."""
-    @staticmethod
-    def correct_format(message: str) -> Optional[str]:
-        """Correct incomplete JSON format."""
-        if not message or '{' not in message:
-            return None
-        open_braces = message.count('{')
-        close_braces = message.count('}')
-        if open_braces > close_braces:
-            return message + '}' * (open_braces - close_braces)
-        elif open_braces == close_braces and open_braces > 0:
-            return message
+    def _try_parse_literals(self, s: str, i: int) -> Tuple[Any, int, bool] | None:
+        """Try to parse boolean and null literals."""
+        literals = (("true", True), ("false", False), ("null", None))
+        for lit, val in literals:
+            if s.startswith(lit, i):
+                return val, i + len(lit), True
         return None
 
+    def _try_parse_number(self, s: str, i: int, n: int) -> Tuple[Any, int, bool] | None:
+        """Try to parse a number value."""
+        num_chars = "+-0123456789.eE"
+        j = i
+        while j < n and s[j] in num_chars:
+            j += 1
 
-class FieldExtractor:
-    """Stateless utility for field extraction from malformed JSON."""
-    @staticmethod
-    def extract_fields(message: str) -> Dict[str, Any]:
-        """Extract key-value pairs from malformed JSON."""
-        if not message:
-            return {}
-        result = {}
-        lines = message.split('\n')
-        for line in lines:
-            key_value = FieldExtractor._extract_key_value_from_line(line.strip())
-            if key_value:
-                key, value = key_value
-                result[key] = value
-        return result
-
-    @staticmethod
-    def _extract_key_value_from_line(line: str) -> Optional[tuple]:
-        """Extract a key-value pair from a single line."""
-        if not line or ':' not in line or '"' not in line:
-            return None
-        try:
-            colon_pos = line.find(':')
-            if colon_pos <= 0:
-                return None
-            key_part = line[:colon_pos].strip()
-            value_part = line[colon_pos + 1:].strip()
-            if not (key_part.startswith('"') and key_part.endswith('"')):
-                return None
-            key = key_part[1:-1]
-            value = ValueParser.parse_value(value_part)
-            return (key, value) if value is not None else None
-        except (IndexError, AttributeError):
+        if j <= i:
             return None
 
+        return self._convert_number_token(s[i:j], j)
 
-class JsonMessageDecoder:
-    """Decoder for complete JSON messages."""
-    def __init__(self, pair_extractor: PairExtractor = None):
-        self._pair_extractor = pair_extractor or PairExtractor()
-
-    def decode(self, message: ParsedMessage) -> Dict[str, Any]:
-        """Decode complete JSON message."""
+    def _convert_number_token(self, tok: str, end_pos: int) -> Tuple[Any, int, bool]:
+        """Convert a number token to appropriate type."""
         try:
-            obj = json.loads(message.content)
-            if isinstance(obj, dict):
-                return self._pair_extractor.extract_complete_pairs(obj)
-        except json.JSONDecodeError:
-            pass
-        return {}
-
-
-class PartialMessageDecoder:
-    """Decoder for partial/malformed JSON messages."""
-    def __init__(self, pair_extractor: PairExtractor = None):
-        self._pair_extractor = pair_extractor or PairExtractor()
-
-    def decode(self, message: ParsedMessage) -> Dict[str, Any]:
-        """Decode partial JSON message."""
-        corrected = MessageFormatter.correct_format(message.content)
-        if corrected:
-            try:
-                obj = json.loads(corrected)
-                if isinstance(obj, dict):
-                    return self._pair_extractor.extract_complete_pairs(obj)
-            except json.JSONDecodeError:
-                pass
-        return FieldExtractor.extract_fields(message.content)
-
-
-class ParquetStyleProcessor:
-    """Main processor using Parquet-inspired columnar processing with dependency injection."""
-    def __init__(self,
-                 message_extractor: MessageExtractor = None,
-                 json_decoder: JsonMessageDecoder = None,
-                 partial_decoder: PartialMessageDecoder = None):
-        self._message_extractor = message_extractor or MessageExtractor()
-        self._json_decoder = json_decoder or JsonMessageDecoder()
-        self._partial_decoder = partial_decoder or PartialMessageDecoder()
-
-    def process_buffer(self, buffer: str) -> Dict[str, Any]: # Original took str
-        """Process buffer using columnar approach."""
-        # This method is part of the original structure and is no longer directly
-        # called by the refactored StreamingJsonParser.
-        messages = self._message_extractor.extract_messages(buffer)
-        parsed_data = {}
-        for message in messages:
-            decoded_data = self._decode_message(message)
-            parsed_data.update(decoded_data)
-        return parsed_data
-
-    def _decode_message(self, message: ParsedMessage) -> Dict[str, Any]:
-        """Decode a single message using the appropriate decoder."""
-        if message.is_complete:
-            return self._json_decoder.decode(message)
-        return self._partial_decoder.decode(message)
-
-# Mandatory tests for the refactored StreamingJsonParser
-def test_streaming_json_parser():
-    parser = StreamingJsonParser()
-    parser.consume('{"foo": "bar"}') # Changed to str
-    assert parser.get() == {"foo": "bar"}
-
-def test_chunked_streaming_json_parser():
-    parser = StreamingJsonParser()
-    parser.consume('{"foo": ') # Changed to str
-    parser.consume('"bar"}') # Changed to str
-    assert parser.get() == {"foo": "bar"}
-
-def test_partial_streaming_json_parser():
-    parser = StreamingJsonParser()
-    parser.consume('{"foo": "bar') # Changed to str
-    assert parser.get() == {"foo": "bar"}
-
-if __name__ == '__main__':
-    test_streaming_json_parser()
-    test_chunked_streaming_json_parser()
-    test_partial_streaming_json_parser()
-    print("Refactored StreamingJsonParser tests passed successfully!")
+            if any(x in tok for x in ".eE"):
+                return float(tok), end_pos, True
+            return int(tok), end_pos, True
+        except ValueError:
+            return tok, end_pos, True

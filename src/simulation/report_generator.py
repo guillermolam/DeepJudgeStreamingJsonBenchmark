@@ -16,15 +16,9 @@ from typing import Dict, Tuple, Any, Optional, List
 import numpy as np
 import pandas as pd
 
+from .metrics_definitions import PerformanceCategoryManager
+
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class PerformanceCategory:
-    """Represents a performance category for analysis."""
-    metric_key: str
-    display_name: str
-    lower_is_better: bool = True
 
 
 class ResultsLoader:
@@ -65,29 +59,6 @@ class FileFinder:
             latest_json = max(json_files, key=lambda f: f.stat().st_mtime)
 
         return latest_csv, latest_json
-
-
-class PerformanceCategoryManager:
-    """Manages performance categories for analysis."""
-
-    def __init__(self):
-        self._categories = [
-            PerformanceCategory('serialize_time_ms', 'Serialization Speed', True),
-            PerformanceCategory('deserialize_time_ms', 'Deserialization Speed', True),
-            PerformanceCategory('throughput_mbps', 'Throughput (MB/s)', False),
-            PerformanceCategory('memory_peak_bytes', 'Memory Efficiency', True),
-            PerformanceCategory('cpu_time_seconds', 'CPU Efficiency', True),
-            PerformanceCategory('dataset_size', 'Data Size', True),
-            PerformanceCategory('total_ser_deser_time_ms', 'Total Processing Time', True)
-        ]
-
-    def get_categories(self) -> List[PerformanceCategory]:
-        """Get all performance categories."""
-        return self._categories
-
-    def get_category_by_key(self, key: str) -> Optional[PerformanceCategory]:
-        """Get category by metric key."""
-        return next((cat for cat in self._categories if cat.metric_key == key), None)
 
 
 class StatisticsCalculator:
@@ -362,7 +333,7 @@ class CsvExporter:
         logger.info(f"CSV summary exported to {output_path}")
 
     @staticmethod
-    def _add_category_data(summary_data: List[Dict], category: PerformanceCategory,
+    def _add_category_data(summary_data: List[Dict], category: "PerformanceCategory",
                            analysis: Dict[str, Any]) -> None:
         """Add data_gen for a single category."""
         for rank, algo in enumerate(analysis['rankings'][category.metric_key], 1):
@@ -435,15 +406,15 @@ class ReportGenerator:
         self.results_dir = Path(results_dir).resolve()
         try:
             self.results_dir.relative_to(base_dir)
-        except ValueError:
-            raise ValueError(f"Invalid results_dir: Path traversal detected. ({self.results_dir})")
+        except ValueError as e:
+            raise ValueError(f"Invalid results_dir: Path traversal detected. ({self.results_dir})") from e
 
         # Sanitize output_dir to prevent path traversal
         self.output_dir = os.path.join(output_dir).resolve()
         try:
             self.output_dir.relative_to(base_dir)
-        except ValueError:
-            raise ValueError(f"Invalid output_dir: Path traversal detected. ({self.output_dir})")
+        except ValueError as e:
+            raise ValueError(f"Invalid output_dir: Path traversal detected. ({self.output_dir})") from e
         self.output_dir.mkdir(exist_ok=True)
 
         # Initialize components

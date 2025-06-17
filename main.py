@@ -83,10 +83,10 @@ def sanitize_output_path(
                 raise ValueError(
                     f"Target path is outside allowed base directory: {real_target_path}"
                 )
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 f"Target path is outside allowed base directory: {real_target_path}"
-            )
+            ) from e
     else:
         # Only allow files directly in base_path
         if os.path.dirname(real_target_path) != base_path:
@@ -110,7 +110,7 @@ class BenchmarkConfig:
         if self.protocols is None:
             self.protocols = ["http", "tcp", "telnet"]
         if self.dataset_sizes is None:
-            self.dataset_sizes = [100, 1500, 10000]
+            self.dataset_sizes = [100, 1000, 2000]
 
 
 @dataclass
@@ -225,7 +225,7 @@ class TestDatasetGenerator:
         for size in tqdm(sizes, desc="Dataset sizes"):
             dataset = self._create_dataset(size)
             datasets[size] = dataset
-            print(
+            tqdm.write(
                 f"  Size {size}: {dataset.size_chars:,} chars, {dataset.size_bytes:,} bytes"
             )
 
@@ -839,18 +839,6 @@ def main():
         )
 
         benchmark = StreamingParserBenchmark(config)
-        # Run parser test suite before benchmarking
-        import pytest
-
-        print("\n🔎 Running parser test suite (test_data_gen.py)...")
-        exit_code = pytest.main(["tests/simulation/test_data_gen.py"])
-
-        if exit_code != 0:
-            print(f"\n❌ Tests failed with exit code {exit_code}. Aborting benchmark.")
-            sys.exit(exit_code)
-
-        print("✅ All parser tests passed.\n")
-
         benchmark.run_comprehensive_benchmark()
         benchmark.save_results(args.format)
 

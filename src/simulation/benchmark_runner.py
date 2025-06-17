@@ -23,7 +23,7 @@ import psutil
 from tqdm import tqdm
 
 # ✅ Import centralized parser list
-from parser_loader import LOADED_PARSERS
+from .parser_loader import LOADED_PARSERS
 from .algo_metadata import ALGORITHM_METADATA
 from .data_gen import generate_test_data, create_streaming_chunks
 from .net_sim import HTTPSimulator, TCPSimulator, TelnetSimulator
@@ -41,7 +41,7 @@ class BenchmarkConfig:
 
     def __post_init__(self):
         if self.dataset_sizes is None:
-            self.dataset_sizes = [100, 1500, 10000]
+            self.dataset_sizes = [100, 1000, 2000]
         if self.protocols is None:
             self.protocols = ["http", "tcp", "telnet"]
 

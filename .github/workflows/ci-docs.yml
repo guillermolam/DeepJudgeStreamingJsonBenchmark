@@ -1,17 +1,51 @@
-# calls tests/scripts/generate_markdown_docs.py
-name: Generate docs
+name: Generate Docs
+
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # ← supports `act` and manual runs
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
-  generate-markdown-docs:
+  build-and-test:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: "Install Python via uv"
+        uses: astral-sh/setup-uv@v6
+
+      - name: "Fallback: Install uv if missing"
+        run: |
+          if ! command -v uv >/dev/null; then
+            python -m pip install --upgrade pip
+            python -m pip install uv
+          fi
+
+      - name: "Cache venv"
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+
+      - name: "Initialize virtual environment"
+        run: uv venv
+
+      - name: "Install dependencies"
+        run: uv pip install -r requirements.txt --python 3.12
+
       - name: "Generate README.md"
         run: |
+          uv pip install pydoc-markdown
           # Remove old docs block
           sed -i '/<!-- API-DOCS:START -->/,$d' README.md
           # Append new API docs
@@ -19,11 +53,11 @@ jobs:
           echo "`n## Project Structure" >> README.md
           tree -F -a >> README.md
 
-      - name: "Generate Serializers Documentation"
-        run: |
-          uv run tests/scripts/generate_markdown_docs.py --files src.serializers --output docs/serializers/
+      - name: "Generate Algorithms Documentation with generate_markdown_docs.py'"
+        run: uv run generate_markdown_docs.py src/serializers/ -o docs/serializers/
 
-      - name: "Upload as artifacts all docs to gh-pages and runs sphinx"
-        run: |
-          uv run python -m sphinx -b html docs/serializers/ docs/serializers/html
-          uv run gh-pages -d docs/serializers/html
+      - name: "Publish to gh-pages"
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs

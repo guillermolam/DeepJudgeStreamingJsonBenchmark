@@ -22,8 +22,6 @@ a large language model (LLM).
 
 ### Requirements:
 
-### Requirements:
-
 1. Create a class named `StreamingJsonParser`.
     2. Implement the following methods within this class:
         1. `__init__()`: Initializes the parser.
@@ -67,10 +65,3 @@ a large language model (LLM).
          parser.consume('{"foo": "bar')
          assert parser.get() == {"foo": "bar"}
         ```
-
-Once you're done, send us a python file with your solution as a response to this E-Mail.
-
-> IMPORTANT: If you want your submission to be considered, please hand it in as a **single** python file called
-`guillermo_lam_streaming_json_parser.py`. Submissions that do not follow this pattern will not be considered.
-
-Thank you and good luck!
