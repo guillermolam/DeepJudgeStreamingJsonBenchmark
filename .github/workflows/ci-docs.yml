@@ -1,0 +1,29 @@
+# calls tests/scripts/generate_markdown_docs.py
+name: Generate docs
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-markdown-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Generate README.md"
+        run: |
+          # Remove old docs block
+          sed -i '/<!-- API-DOCS:START -->/,$d' README.md
+          # Append new API docs
+          uv run pydoc-markdown -p src --render-toc >> README.md
+          echo "`n## Project Structure" >> README.md
+          tree -F -a >> README.md
+
+      - name: "Generate Serializers Documentation"
+        run: |
+          uv run tests/scripts/generate_markdown_docs.py --files src.serializers --output docs/serializers/
+
+      - name: "Upload as artifacts all docs to gh-pages and runs sphinx"
+        run: |
+          uv run python -m sphinx -b html docs/serializers/ docs/serializers/html
+          uv run gh-pages -d docs/serializers/html

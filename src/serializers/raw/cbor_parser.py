@@ -88,7 +88,7 @@ class StreamingJsonParser:
                         tokens.append(token_info)
                         current_token = ""
 
-                    if char.strip() and char in '{}[],':
+                    if char.strip() and char in '{}[],:': # Added ':' to the list of structural characters
                         # Structural tokens
                         tokens.append({
                             'major_type': 'structural',

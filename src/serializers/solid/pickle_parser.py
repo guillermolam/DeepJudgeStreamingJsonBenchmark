@@ -1,31 +1,251 @@
-
 """
 Pickle streaming parser implementation with SOLID principles.
 
-This module implements a streaming JSON parser inspired by Pickle object serialization.
-It follows SOLID principles with clean separation of concerns, stateless operations where possible,
-and cognitive complexity under 14 for all methods.
-
-Key Features:
-- Object reconstruction inspired by Pickle
-- Incremental JSON parsing with single-threaded processing
-- Stateless utility functions and processors
-- Clean separation between character processing, object handling, and data extraction
-- Comprehensive error handling and recovery
-
-Architecture:
-- ParserState: Immutable state container using @dataclass
-- Static utility classes for character validation and object processing
-- Dependency injection for loose coupling
-- Single responsibility principle throughout
+This module *previously* implemented a streaming JSON parser inspired by Pickle object serialization.
+The StreamingJsonParser class below has been refactored to be a direct, byte-based
+streaming JSON parser adhering to the project-wide specification.
+The original Pickle-inspired helper classes remain but are no longer used by StreamingJsonParser.
 """
 import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 
+# --- Start of Refactored StreamingJsonParser and its dependencies ---
+# (Identical to the implementation in raw/ultrajson_parser.py for consistency and compliance)
 
+# State constants for the parser
+_ST_EXPECT_OBJ_START = 0
+_ST_EXPECT_KEY_START = 1  # After '{' or ','
+_ST_IN_KEY = 2
+_ST_IN_KEY_ESCAPE = 3
+_ST_EXPECT_COLON = 4
+_ST_EXPECT_VALUE_START = 5
+_ST_IN_STRING_VALUE = 6
+_ST_IN_STRING_VALUE_ESCAPE = 7
+_ST_IN_NUMBER = 8
+_ST_IN_TRUE = 9
+_ST_IN_FALSE = 10
+_ST_IN_NULL = 11
+_ST_EXPECT_COMMA_OR_OBJ_END = 12
+_ST_OBJ_END = 13
+_ST_ERROR = 99
+
+_WHITESPACE = b" \t\n\r"
+_DIGITS = b"0123456789"
+_NUMBER_CHARS = _DIGITS + b"-.eE+"
+
+class StreamingJsonParser:
+    """
+    A streaming JSON parser that processes byte-based input incrementally.
+    It can handle partial JSON objects and incomplete string values,
+    returning the currently parsed data structure at any point.
+    This version replaces the original Pickle-style parser in this module.
+    """
+
+    def __init__(self):
+        """Initializes the streaming JSON parser."""
+        self._buffer = bytearray()
+        self._result: Dict[str, Any] = {}
+        self._state = _ST_EXPECT_OBJ_START
+
+        self._current_key_bytes = bytearray()
+        self._current_value_bytes = bytearray()
+        
+        self._active_key: Optional[str] = None # Stores the decoded string of the last fully parsed key
+        self._idx = 0 # Current parsing index within self._buffer
+
+    def consume(self, buffer: str) -> None:
+        """
+        Consumes a chunk of JSON data.
+
+        Args:
+            buffer: A string containing a part of the JSON document.
+        """
+        if not isinstance(buffer, str):
+            return # Ignore invalid chunk types gracefully
+        # Convert string to bytes for internal processing
+        chunk = buffer.encode('utf-8')
+        self._buffer.extend(chunk)
+        self._process_buffer()
+
+    def get(self) -> Dict[str, Any]:
+        """
+        Returns the current state of the parsed JSON object.
+        This includes any fully parsed key-value pairs and partially
+        completed string values if a key has been fully parsed.
+        Incomplete keys are not included.
+
+        Returns:
+            A dictionary representing the currently parsed JSON object.
+        """
+        output_dict = self._result.copy()
+
+        if self._active_key is not None and self._state == _ST_IN_STRING_VALUE:
+            if self._current_value_bytes:
+                try:
+                    partial_value_str = self._current_value_bytes.decode('utf-8', errors='replace')
+                    output_dict[self._active_key] = partial_value_str
+                except Exception:
+                    pass 
+        return output_dict
+
+    def _handle_escape_char(self, byte_val: int) -> int:
+        """Handles JSON escape sequences."""
+        if byte_val == b'"'[0]: return b'"'[0]
+        if byte_val == b'\\'[0]: return b'\\'[0]
+        if byte_val == b'/'[0]: return b'/'[0]
+        if byte_val == b'b'[0]: return b'\b'[0]
+        if byte_val == b'f'[0]: return b'\f'[0]
+        if byte_val == b'n'[0]: return b'\n'[0]
+        if byte_val == b'r'[0]: return b'\r'[0]
+        if byte_val == b't'[0]: return b'\t'[0]
+        return byte_val
+
+    def _finalize_value(self, value: Any):
+        """Helper to assign a parsed value to the active key and reset."""
+        if self._active_key is not None:
+            self._result[self._active_key] = value
+        self._active_key = None
+        self._current_value_bytes.clear()
+        self._state = _ST_EXPECT_COMMA_OR_OBJ_END
+        
+    def _parse_and_finalize_number(self):
+        """Parses the number in _current_value_bytes and finalizes it."""
+        if not self._current_value_bytes:
+            self._state = _ST_ERROR; return False
+
+        num_str = self._current_value_bytes.decode('utf-8') 
+
+        if num_str == "-" or num_str == "+" or num_str.endswith(('.', 'e', 'E', '+', '-')):
+            self._state = _ST_ERROR; return False
+
+        try:
+            if any(c in num_str for c in ('.', 'e', 'E')):
+                parsed_num = float(num_str)
+            else:
+                parsed_num = int(num_str)
+            self._finalize_value(parsed_num)
+            return True
+        except ValueError: 
+            self._state = _ST_ERROR; return False
+
+    def _process_buffer(self):
+        """Processes the internal buffer to parse JSON content using a state machine."""
+        buffer_len = len(self._buffer)
+        while self._idx < buffer_len:
+            byte = self._buffer[self._idx]
+
+            if self._state == _ST_EXPECT_OBJ_START:
+                if byte in _WHITESPACE: self._idx += 1; continue
+                if byte == b'{'[0]: self._state = _ST_EXPECT_KEY_START; self._idx += 1
+                else: self._state = _ST_ERROR; return 
+            
+            elif self._state == _ST_EXPECT_KEY_START:
+                if byte in _WHITESPACE: self._idx += 1; continue
+                if byte == b'"'[0]:
+                    self._state = _ST_IN_KEY
+                    self._current_key_bytes.clear()
+                    self._active_key = None 
+                    self._idx += 1
+                elif byte == b'}'[0]: self._state = _ST_OBJ_END; self._idx += 1
+                else: self._state = _ST_ERROR; return 
+
+            elif self._state == _ST_IN_KEY:
+                if byte == b'\\'[0]: self._state = _ST_IN_KEY_ESCAPE; self._idx += 1
+                elif byte == b'"'[0]:
+                    try:
+                        self._active_key = self._current_key_bytes.decode('utf-8')
+                        self._state = _ST_EXPECT_COLON
+                    except UnicodeDecodeError:
+                        self._active_key = None; self._state = _ST_ERROR; return 
+                    self._idx += 1
+                else: self._current_key_bytes.append(byte); self._idx += 1
+            
+            elif self._state == _ST_IN_KEY_ESCAPE:
+                self._current_key_bytes.append(self._handle_escape_char(byte))
+                self._state = _ST_IN_KEY; self._idx += 1
+
+            elif self._state == _ST_EXPECT_COLON:
+                if byte in _WHITESPACE: self._idx += 1; continue
+                if byte == b':'[0]: self._state = _ST_EXPECT_VALUE_START; self._idx += 1
+                else: self._state = _ST_ERROR; return 
+
+            elif self._state == _ST_EXPECT_VALUE_START:
+                if byte in _WHITESPACE: self._idx += 1; continue
+                self._current_value_bytes.clear()
+                if byte == b'"'[0]: self._state = _ST_IN_STRING_VALUE; self._idx += 1
+                elif byte == b't'[0]: self._state = _ST_IN_TRUE; self._current_value_bytes.append(byte); self._idx += 1
+                elif byte == b'f'[0]: self._state = _ST_IN_FALSE; self._current_value_bytes.append(byte); self._idx += 1
+                elif byte == b'n'[0]: self._state = _ST_IN_NULL; self._current_value_bytes.append(byte); self._idx += 1
+                elif byte in _NUMBER_CHARS and (byte != b'+'[0]): 
+                    self._state = _ST_IN_NUMBER; self._current_value_bytes.append(byte); self._idx += 1
+                else: self._state = _ST_ERROR; return 
+
+            elif self._state == _ST_IN_STRING_VALUE:
+                if byte == b'\\'[0]: self._state = _ST_IN_STRING_VALUE_ESCAPE; self._idx += 1
+                elif byte == b'"'[0]:
+                    if self._active_key is not None:
+                        try:
+                            value_str = self._current_value_bytes.decode('utf-8')
+                            self._finalize_value(value_str)
+                        except UnicodeDecodeError: 
+                            value_str = self._current_value_bytes.decode('utf-8', errors='replace')
+                            self._finalize_value(value_str)
+                    else: 
+                        self._state = _ST_ERROR; return
+                    self._idx += 1
+                else: self._current_value_bytes.append(byte); self._idx += 1
+
+            elif self._state == _ST_IN_STRING_VALUE_ESCAPE:
+                self._current_value_bytes.append(self._handle_escape_char(byte))
+                self._state = _ST_IN_STRING_VALUE; self._idx += 1
+            
+            elif self._state == _ST_IN_TRUE:
+                self._current_value_bytes.append(byte); self._idx += 1
+                if self._current_value_bytes == b"true": self._finalize_value(True)
+                elif not b"true".startswith(self._current_value_bytes): self._state = _ST_ERROR; return
+            
+            elif self._state == _ST_IN_FALSE:
+                self._current_value_bytes.append(byte); self._idx += 1
+                if self._current_value_bytes == b"false": self._finalize_value(False)
+                elif not b"false".startswith(self._current_value_bytes): self._state = _ST_ERROR; return
+
+            elif self._state == _ST_IN_NULL:
+                self._current_value_bytes.append(byte); self._idx += 1
+                if self._current_value_bytes == b"null": self._finalize_value(None)
+                elif not b"null".startswith(self._current_value_bytes): self._state = _ST_ERROR; return
+            
+            elif self._state == _ST_IN_NUMBER:
+                if byte in _NUMBER_CHARS: 
+                    self._current_value_bytes.append(byte); self._idx += 1
+                else: 
+                    if not self._parse_and_finalize_number(): return 
+            
+            elif self._state == _ST_EXPECT_COMMA_OR_OBJ_END:
+                if byte in _WHITESPACE: self._idx += 1; continue
+                if byte == b','[0]: self._state = _ST_EXPECT_KEY_START; self._idx += 1
+                elif byte == b'}'[0]: self._state = _ST_OBJ_END; self._idx += 1
+                else: self._state = _ST_ERROR; return 
+
+            elif self._state == _ST_OBJ_END:
+                if byte in _WHITESPACE: self._idx += 1; continue 
+                self._state = _ST_ERROR; return 
+
+            elif self._state == _ST_ERROR:
+                return 
+
+            else: 
+                self._state = _ST_ERROR; return
+        
+        if self._idx > 0:
+            self._buffer = self._buffer[self._idx:]
+            self._idx = 0
+
+# --- End of Refactored StreamingJsonParser ---
+
+# --- Original Pickle-inspired helper classes (now unused by StreamingJsonParser) ---
 @dataclass
-class ParserState:
+class ParserState: # Original class
     """Immutable state container for the Pickle parser."""
     buffer: str = ""
     parsed_data: Dict[str, Any] = field(default_factory=dict)
@@ -80,7 +300,7 @@ class CharacterValidator:
         return char == '}'
 
 
-class PairExtractor:
+class PairExtractor: # Original class
     """Extracts complete key-value pairs from objects using stateless operations."""
 
     @staticmethod
@@ -205,7 +425,7 @@ class BraceBalancer:
         return text + '}' * missing_braces
 
 
-class ObjectParser:
+class ObjectParser: # Original class
     """Parses JSON objects using Pickle-inspired techniques."""
 
     def __init__(self,
@@ -280,7 +500,7 @@ class PartialParser:
         if BraceBalancer.needs_balancing(open_count, close_count):
             return BraceBalancer.balance_string(test_str, open_count, close_count)
 
-        return None
+        return None # Original returned None, not test_str
 
     @staticmethod
     def _try_parse_json(json_str: str) -> Optional[Dict[str, Any]]:
@@ -319,15 +539,15 @@ class SingleThreadedProcessor:
         self._string_handler = string_handler or StringHandler()
         self._partial_parser = partial_parser or PartialParser()
 
-    def parse_single_threaded(self, buffer: str) -> Dict[str, Any]:
+    def parse_single_threaded(self, buffer: str) -> Dict[str, Any]: # Original took str
         """Parse using single-threaded Pickle-inspired strategy."""
+        # This method is part of the original structure and is no longer directly
+        # called by the refactored StreamingJsonParser.
         parsed_data = {}
-
         for i, char in enumerate(buffer):
             new_data = self._process_character(char, buffer, i)
             if JsonValidator.has_content(new_data):
                 parsed_data.update(new_data)
-
         return parsed_data
 
     def _process_character(self, char: str, buffer: str, position: int) -> Dict[str, Any]:
@@ -336,65 +556,38 @@ class SingleThreadedProcessor:
             return self._handle_open_brace(buffer, position)
         elif CharacterValidator.is_quote_char(char):
             self._handle_quote(buffer, position)
-
         return {}
 
     def _handle_open_brace(self, buffer: str, position: int) -> Dict[str, Any]:
         """Handle opening brace with fallback."""
         new_data = self._object_parser.parse_object_at_position(buffer, position)
-
         if not JsonValidator.has_content(new_data):
             new_data = self._partial_parser.try_partial_parse(buffer, position)
-
         return new_data
 
     def _handle_quote(self, buffer: str, position: int) -> None:
         """Handle quote character."""
         self._string_handler.handle_string_start(buffer, position)
 
+# Mandatory tests for the refactored StreamingJsonParser
+def test_streaming_json_parser():
+    parser = StreamingJsonParser()
+    parser.consume('{"foo": "bar"}')
+    assert parser.get() == {"foo": "bar"}
 
-class StreamingJsonParser:
-    """Streaming JSON parser with Pickle-inspired object reconstruction."""
+def test_chunked_streaming_json_parser():
+    parser = StreamingJsonParser()
+    parser.consume('{"foo": ')
+    parser.consume('"bar"}')
+    assert parser.get() == {"foo": "bar"}
 
-    def __init__(self, processor: SingleThreadedProcessor = None):
-        """Initialize the streaming JSON parser with dependency injection."""
-        self._state = ParserState()
-        self._processor = processor or SingleThreadedProcessor()
+def test_partial_streaming_json_parser():
+    parser = StreamingJsonParser()
+    parser.consume('{"foo": "bar')
+    assert parser.get() == {"foo": "bar"}
 
-    @property
-    def _buffer(self) -> str:
-        return self._state.buffer
-
-    @_buffer.setter
-    def _buffer(self, value: str) -> None:
-        self._state.buffer = value
-
-    @property
-    def _parsed_data(self) -> Dict[str, Any]:
-        return self._state.parsed_data
-
-    def consume(self, buffer: str) -> None:
-        """
-        Process a chunk of JSON data incrementally using Pickle-inspired processing.
-
-        Args:
-            buffer: String chunk of JSON data to process
-        """
-        self._buffer += buffer
-        new_data = self._processor.parse_single_threaded(self._buffer)
-        if JsonValidator.has_content(new_data):
-            self._parsed_data.update(new_data)
-
-    def get(self) -> Dict[str, Any]:
-        """
-        Return current parsed state as a Python object.
-
-        Returns:
-            Dictionary containing all complete key-value pairs parsed so far
-        """
-        return self._sorted_copy(self._parsed_data)
-
-    @staticmethod
-    def _sorted_copy(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Return a dict sorted by keys for deterministic output."""
-        return {k: data[k] for k in sorted(data.keys())}
+if __name__ == '__main__':
+    test_streaming_json_parser()
+    test_chunked_streaming_json_parser()
+    test_partial_streaming_json_parser()
+    print("Refactored StreamingJsonParser tests passed successfully!")

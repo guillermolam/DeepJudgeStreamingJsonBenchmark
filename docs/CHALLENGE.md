@@ -25,12 +25,13 @@ a large language model (LLM).
 ### Requirements:
 
 1. Create a class named `StreamingJsonParser`.
-2. Implement the following methods within this class:
-    1. `__init__()`: Initializes the parser.
-    2. `consume(buffer: str)`: Consumes a chunk of JSON data.
-    3. `get()`: Returns the current state of the parsed JSON object as an appropriate Python object.
-    4. Even if the input JSON data is incomplete, the parser should be able to return the current state of the parsed
-       JSON object at any given point in time.
+    2. Implement the following methods within this class:
+        1. `__init__()`: Initializes the parser.
+        2. `consume(buffer: str)`: Consumes a chunk of JSON data.
+        3. `get()`: Returns the current state of the parsed JSON object as an appropriate Python object.
+        4. Even if the input JSON data is incomplete, the parser should be able to return the current state of the
+           parsed
+           JSON object at any given point in time.
     5. This should include partial string-values and objects, but not the keys themselves,
     6. i.e. `{"test": "hello", "worl` is a partial representation of `{"test": "hello"}`,
     7. `{"test": "hello", "worl": ""}` is not a valid representation of `{"test": "hello"}`

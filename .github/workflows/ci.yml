@@ -32,23 +32,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-venv-
 
-      - name: Initialize virtual environment
+      - name: "Initialize virtual environment"
         run: uv venv
 
       - name: "Install dependencies"
-        run: uv pip install -r requirements.txt
+        run: uv pip install -r requirements.txt --python 3.12
 
       - name: "Install dev & CI tools"
         run: uv pip install pytest pytest-cov pytest-benchmark black flake8 isort pydoc-markdown
 
       - name: "Test & Benchmark"
-        run: uv run pytest --maxfail=1 --disable-warnings --benchmark-only
+        run: uv run pytest --disable-warnings --benchmark-only
 
       - name: "Lint & Format"
         run: |
           uv run black --check .
           uv run isort --check-only .
           uv run flake8 .
+
+      - name: "Run Benchmark (main.py)"
+        run: uv run python src/main.py
+
+      - name: "Upload Benchmark Results"
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-results
+          path: tests/.benchmarks/
 
       - name: "Generate README.md"
         run: |

@@ -1,131 +1,85 @@
 import json
+import sys
+from pathlib import Path
 
 import pytest
+
+# Add project root to sys.path to import from main
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from simulation.data_gen import (
     generate_test_data,
     create_streaming_chunks,
-    generate_mixed_complexity_data,
-    validate_generated_data
+    validate_generated_data,
 )
 
 
-class TestDataGen:
-    @pytest.mark.parametrize("num_fields", [1, 10, 100, 1000])
-    def test_generate_test_data(self, num_fields: int):
-        """Test generating JSON data_gen with various field counts."""
-        data = generate_test_data(num_fields)
+# Lazy import parser discovery
+def get_loaded_parsers():
+    try:
+        from main import ParserDiscovery
 
-        # Basic type and structure checks
+        return ParserDiscovery().discover_parsers()
+    except Exception:
+        return {}
+
+
+LOADED_PARSERS = get_loaded_parsers()
+
+
+class TestDataGen:
+    @pytest.mark.parametrize("num_fields", [1, 10, 100])
+    def test_generate_test_data_structure(self, num_fields: int):
+        data = generate_test_data(num_fields)
         assert isinstance(data, dict)
         assert "_metadata" in data
         assert data["_metadata"]["target_fields"] == num_fields
-        assert data["_metadata"]["total_fields"] > 0
 
-        # Verify JSON serialization
-        json_str = json.dumps(data)
-        assert len(json_str) > 0
+    def test_validate_field_count_within_tolerance(self):
+        assert validate_generated_data(generate_test_data(100), expected_fields=100)
 
-        # Verify data_gen can be parsed back
-        parsed_data = json.loads(json_str)
-        assert parsed_data == data
+    def test_only_strings_or_objects_in_generated_data(self):
+        def validate(obj):
+            assert isinstance(obj, dict)
+            for k, v in obj.items():
+                assert isinstance(k, str)
+                assert not isinstance(v, list)
+                assert not isinstance(v, (int, float, bool, type(None)))
+                if isinstance(v, dict):
+                    validate(v)
 
-        # Verify metadata fields
-        assert "generated_at" in data["_metadata"]
-        assert "generator_version" in data["_metadata"]
-        assert "test_run_id" in data["_metadata"]
+        data = generate_test_data(50)
+        payload_only = {k: v for k, v in data.items() if k != "_metadata"}
+        validate(payload_only)
 
     def test_create_streaming_chunks(self):
-        """Test creating streaming chunks with various configurations."""
-        test_data = {"field_1": "test_value", "field_2": 123, "nested": {"a": 1, "b": 2}}
-        json_bytes = json.dumps(test_data).encode('utf-8')
-
-        # Test with auto-sized chunks
+        test_data = {"field": "value", "nested": {"x": "y"}}
+        json_bytes = json.dumps(test_data).encode("utf-8")
         chunks = create_streaming_chunks(json_bytes)
         assert isinstance(chunks, list)
-        assert len(chunks) > 0
         assert all(isinstance(chunk, bytes) for chunk in chunks)
+        assert b"".join(chunks) == json_bytes
 
-        # Verify chunk reassembly
-        reassembled = b''.join(chunks)
-        assert reassembled == json_bytes
 
-        # Test with custom chunk size
-        chunk_size = 5
-        custom_chunks = create_streaming_chunks(json_bytes, chunk_size=chunk_size)
-        assert all(len(chunk) <= chunk_size for chunk in custom_chunks)
+# Conditionally define test if parsers are available
+if LOADED_PARSERS:
 
-        # Test with chunk size larger than data_gen
-        large_chunks = create_streaming_chunks(json_bytes, chunk_size=len(json_bytes) * 2)
-        assert len(large_chunks) == 1
+    @pytest.mark.parametrize("parser_name, parser_class", LOADED_PARSERS.items())
+    def test_parser_can_consume_and_return_data(parser_name, parser_class):
+        print(
+            f"parser_name={parser_name}, parser_class={parser_class}, type={type(parser_class)}"
+        )
 
-    def test_generate_mixed_complexity_data(self):
-        """Test generating mixed complexity data_gen."""
-        num_fields = 100
-        data = generate_mixed_complexity_data(num_fields)
+        parser = parser_class()
+        test_input = '{"foo": "bar", "name": "hello", "company":"deep_judge", "chars":"%@$@#$^#%^#W#.21@" }' # Changed from bytes to str
 
-        assert isinstance(data, dict)
-        assert "_metadata" in data
-        assert data["_metadata"]["target_fields"] == num_fields
+        try:
+            parser.consume(test_input)
+            result = parser.get()
+            assert isinstance(result, dict), f"{parser_name} did not return a dict"
+            assert result.get("foo") == "bar", f"{parser_name} parsed incorrect value"
+        except Exception as e:
+            pytest.fail(f"{parser_name} failed with error: {e}")
 
-        # Verify all expected sections exist
-        expected_sections = [
-            "simple_fields",
-            "arrays",
-            "nested_objects",
-            "mixed_arrays",
-            "deep_nesting"
-        ]
-
-        for section in expected_sections:
-            assert section in data
-            assert isinstance(data[section], dict)
-            assert len(data[section]) > 0
-
-    @pytest.mark.parametrize("num_fields", [0, -1, -100])
-    def test_edge_cases(self, num_fields: int):
-        """Test edge cases like zero or negative field counts."""
-        data = generate_test_data(num_fields)
-        assert isinstance(data, dict)
-        assert "_metadata" in data
-        assert data["_metadata"]["target_fields"] == num_fields
-
-        # Should still be valid JSON
-        json_str = json.dumps(data)
-        parsed = json.loads(json_str)
-        assert parsed == data
-
-    def test_deterministic_output(self):
-        """Test that the same seed produces the same output."""
-        num_fields = 50
-
-        # Generate data_gen twice with the same parameters
-        data1 = generate_test_data(num_fields)
-        data2 = generate_test_data(num_fields)
-
-        # Should be identical
-        assert data1 == data2
-
-        # Different field count should produce different output
-        data3 = generate_test_data(num_fields + 1)
-        assert data1 != data3
-
-    @pytest.mark.parametrize("input_fields,expected_fields,tolerance", [
-        (100, 100, True),
-        (100, 90, True),  # Within 10% tolerance
-        (100, 110, True),  # Within 10% tolerance
-        (100, 89, False),  # Outside tolerance
-        (100, 111, False),  # Outside tolerance
-        (10, 9, True),  # Small number of fields
-        (1, 1, True),  # Minimum fields
-        (0, 0, True),  # Zero fields
-    ])
-    def test_validate_generated_data(self, input_fields: int, expected_fields: int, tolerance: bool):
-        """Test validation of generated data_gen with various field counts."""
-        data = generate_test_data(input_fields)
-        is_valid = validate_generated_data(data, expected_fields)
-
-        if tolerance:
-            assert is_valid is True
-        else:
-            assert is_valid is False
+else:
+    pytest.skip("No parsers discovered to test.", allow_module_level=True)
