@@ -188,5 +188,3 @@ act -j build-and-test --env RUST_LOG=info
 
 ---
 
-Would you like a version of this that works on macOS/Linux too using `platforms`?
-Or to add `uv run` support to run scripts inside the virtual environment using tasks?

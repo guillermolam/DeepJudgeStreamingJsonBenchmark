@@ -1,9 +1,10 @@
-import os
-import ast
 import argparse
+import ast
+import os
 import subprocess
 from pathlib import Path
 from typing import List, Set
+
 import asttokens
 
 EXCLUDED_PREFIXES = ("__", ".")
@@ -13,7 +14,11 @@ def find_py_files(paths: List[str], max_depth: int) -> Set[Path]:
     py_files = set()
     for path in paths:
         p = Path(path)
-        if p.is_file() and p.suffix == ".py" and not p.name.startswith(EXCLUDED_PREFIXES):
+        if (
+            p.is_file()
+            and p.suffix == ".py"
+            and not p.name.startswith(EXCLUDED_PREFIXES)
+        ):
             py_files.add(p.resolve())
         elif p.is_dir():
             for subpath in p.rglob("*.py"):
@@ -22,9 +27,8 @@ def find_py_files(paths: List[str], max_depth: int) -> Set[Path]:
                 except ValueError:
                     continue
                 depth = len(relative.parts)
-                if (
-                    depth <= max_depth
-                    and not subpath.name.startswith(EXCLUDED_PREFIXES)
+                if depth <= max_depth and not subpath.name.startswith(
+                    EXCLUDED_PREFIXES
                 ):
                     py_files.add(subpath.resolve())
     return py_files
@@ -130,10 +134,19 @@ def generate_markdown(file_path: Path, output_dir: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate Markdown documentation for Python files.")
+    parser = argparse.ArgumentParser(
+        description="Generate Markdown documentation for Python files."
+    )
     parser.add_argument("files", nargs="+", help="File(s) or folder(s) to document")
-    parser.add_argument("-o", "--output", default="docs", help="Output directory (default: docs/)")
-    parser.add_argument("--max-depth", type=int, default=4, help="Max folder recursion depth (default: 4)")
+    parser.add_argument(
+        "-o", "--output", default="docs", help="Output directory (default: docs/)"
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=4,
+        help="Max folder recursion depth (default: 4)",
+    )
     args = parser.parse_args()
 
     files = find_py_files(args.files, args.max_depth)
