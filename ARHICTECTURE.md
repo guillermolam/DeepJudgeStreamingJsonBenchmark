@@ -4,61 +4,57 @@
 ![Bandit](https://github.com/USER/REPO/actions/workflows/bandit.yml/badge.svg)
 ![CI](https://github.com/USER/REPO/actions/workflows/ci.yml/badge.svg)
 
-This document explains how the repository organises code for discovering the best serialization algorithm via pseudo‑benchmarking with adversarial conditions.
+This document outlines how the project organises its code to benchmark a variety of JSON serialization algorithms. The benchmarks are deliberately adversarial: data is streamed in small chunks over simulated network protocols to expose weaknesses in each implementation.
 
 ## Approach
 
-The project implements multiple streaming JSON parsers under `src/serializers`. Each parser follows a common interface so that the benchmark runner can load them dynamically. The benchmark harness generates datasets of increasing size, transmits those chunks through simulated network layers and records detailed metrics. Results are ranked to determine which algorithm performs best.
+The repository contains multiple parsers under `src/serializers`. Each parser shares a common interface so that the benchmark runner can load them dynamically. `main.py` orchestrates the entire benchmark process:
 
-### Pseudo‑Benchmarking
+1. Parsers are discovered via `parser_loader.py`.
+2. Synthetic datasets of increasing complexity are produced by `src/simulation/data_gen.py`.
+3. Each dataset is sent through `src/simulation/net_sim.py` which mimics HTTP, TCP and Telnet traffic with artificial delays.
+4. `src/simulation/benchmark_runner.py` measures throughput, CPU time and memory usage for each parser and dataset size. Both sequential and parallel runs are supported.
+5. Results are collected, ranked and written to disk. `src/simulation/report_generator.py` summarises the winners for every metric.
 
-1. **Dataset generation** – `DataGenerator` in `simulation/data_gen.py` produces dictionaries containing only strings or nested objects. `create_streaming_chunks` splits the JSON bytes so that parsers must handle partial input.
-2. **Network simulation** – `simulation/net_sim.py` mimics HTTP, TCP and Telnet by wrapping chunks with protocol overhead and introducing latency. This adversarial environment highlights performance differences when data is fragmented or delayed.
-3. **Benchmark execution** – `simulation/benchmark_runner.py` and `main.py` orchestrate runs for every parser, dataset size and protocol. CPU usage, memory, throughput and timing data are collected via `MetricsCollector` and `Timer` utilities.
-4. **Parallel runs** – `ParallelBenchmarkRunner` measures theoretical speedup using multiple processes and applies Amdahl’s law to determine efficiency.
-5. **Reporting** – `simulation/report_generator.py` loads the raw CSV/JSON results, ranks algorithms by several categories and outputs summaries showing the top performer for each metric.
+## Metrics and KPIs
 
-### Metrics and KPIs
+The benchmark collects the following metrics (stored in `BenchmarkMetrics`):
 
-Key metrics stored in `BenchmarkMetrics` include:
+- `serialize_time_ms` and `deserialize_time_ms` – time spent encoding or decoding
+- `throughput_mbps` – how many megabytes per second the parser processes
+- `cpu_time_seconds` – CPU time consumed during the run
+- `memory_peak_bytes` – maximum resident set size
+- `network_latency_ms` – simulated latency added by the network layer
+- Parallel speedup and efficiency when multiple processes are used
 
-- `serialize_time_ms` and `deserialize_time_ms`
-- `throughput_mbps`
-- `cpu_time_seconds`
-- `memory_peak_bytes`
-- `network_latency_ms`
-- Speedup and efficiency numbers
+Lower time and memory values indicate better performance. Higher throughput means the parser can process data faster.
 
-These are the KPIs used to rank algorithms. Lower times and memory usage are better, while higher throughput indicates faster processing.
+## Simulation Steps
 
-### Simulation Steps
-
-1. **Discover parsers** via `ParserDiscovery` or the helper `parser_loader`.
-2. **Generate datasets** with `TestDatasetGenerator`.
-3. **Simulate protocol** transmission through `NetworkSimulatorFactory`.
-4. **Run benchmarks** sequentially then in parallel for each parser and dataset.
-5. **Store metrics** in `BenchmarkResultsManager` and save as CSV and JSON.
-6. **Analyze results** using `ReportGenerator` which finds the best algorithms per category.
-
-The winner for each metric is simply the top‑ranked parser when sorted according to the relevant KPI. The detailed report summarises these champions.
+1. **Discover parsers** with `ParserDiscovery` or the helper `parser_loader`.
+2. **Generate datasets** using `TestDatasetGenerator`.
+3. **Simulate network conditions** via `NetworkSimulatorFactory` and `simulate_transmission`.
+4. **Execute benchmarks** sequentially and then in parallel.
+5. **Save metrics** to CSV/JSON with `BenchmarkResultsManager`.
+6. **Analyze results** using `ReportGenerator`. The top ranked parser for each KPI is considered the winner.
 
 ## File Overview
 
 ```
-main.py                  – CLI entry point and high level benchmark workflow
+main.py                  – CLI entry point and benchmark workflow
 parser_loader.py         – Discovers parser classes automatically
 src/
   serializers/           – Implementations of serialization algorithms
     anyio/               – Async‑friendly versions
-    raw/                 – Baseline reference implementations
+    raw/                 – Baseline implementations
     solid/               – Optimised variants
-  simulation/            – Benchmarking framework
+  simulation/            – Benchmark framework
     benchmark_runner.py  – Executes benchmarks and collects metrics
-    data_gen.py          – Synthetic dataset generator
-    net_sim.py           – HTTP/TCP/Telnet network simulators
+    data_gen.py          – Generates synthetic JSON datasets
+    net_sim.py           – Simulates TCP/HTTP/Telnet networks
     algo_metadata.py     – Complexity metadata for algorithms
+    report_generator.py  – Generates comparative reports
     utils.py             – Helper utilities and statistics
-    report_generator.py  – Generates analysis reports
 tests/                   – Unit and integration tests
 ```
 
@@ -106,4 +102,3 @@ flowchart TD
     P --> Q[save_results]
     Q --> R[ReportGenerator.generate_report]
 ```
-
